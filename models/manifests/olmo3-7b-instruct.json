@@ -1,0 +1,34 @@
+{
+  "name": "olmo3-7b-instruct",
+  "source": {
+    "hf_repo": "allenai/Olmo-3-7B-Instruct",
+    "revision": "6e5971d9eba42665f5bd5a0fcf047f299ce1dccc",
+    "files_sha256": {
+      "chat_template.jinja": "f5186d42d99c8a0445d37fd8a6c7ccf07fe3e24a29ce622d8bd245da9507b12b",
+      "config.json": "6282ae812f9e494bd212e9a3233d68dc4d5f1e2569642423d2b79a3e80373ef8",
+      "generation_config.json": "745e78c16cc40cbb08827f7b7c9d5a888f7cb908236d4ca0443ff47f43a9d5af",
+      "merges.txt": "b6fe424e334903f7fb84d3a106d9730455f4744b9fe3c21ee136d97a00e72502",
+      "model-00001-of-00003.safetensors": "e7bd4c8ba52177a815aee5929cb458a116a65799688d3e51402500a1cb77023c",
+      "model-00002-of-00003.safetensors": "ea92aa0499a2ca02400e5d87324009e172bdbfb9809f2ac501485d8224382328",
+      "model-00003-of-00003.safetensors": "d50f95e4f2ec5fc4fbce6217cbf54fd1d700928b05e5550c8ee08bf4ba948925",
+      "model.safetensors.index.json": "47a8266860f2a5f95c021fb4d7d3a469a95ee8b445742becbb6b19632cfc6e95",
+      "special_tokens_map.json": "78afb564e81264029b25f9caf24bda2521d5bdaeff5cd3fdbc01d3da2e8ce2f2",
+      "tokenizer.json": "7738a25c46a6043a0e2e605138851baa450269ce9d800af6ca9bf6192e45510c",
+      "tokenizer_config.json": "f7a2753a4ff30657e452c8fef02b9a99a3b900ceb4c65a1e3fbea6a3bfab07a6",
+      "vocab.json": "d8eb44d0d51f5e39c9b14825ca8bd10a2500f99c438ca81d4462f0263acd3b53"
+    }
+  },
+  "conversion": {
+    "llama_cpp_commit": "f3fb2fcdbc93a8f677e893b8dbd36462b3190ffd",
+    "llama_cpp_release_build": "b11734",
+    "intermediate": "bf16",
+    "quant": "Q8_0",
+    "note": "quantised with prebuilt b11734 win-vulkan llama-quantize"
+  },
+  "output": {
+    "file": "olmo3-7b-instruct-Q8_0.gguf",
+    "size_bytes": 7759251840,
+    "sha256": "8fb6b9319bf80b231ded7c5d85b740b553194f80995447e2d5c3b204f7e48a28"
+  },
+  "created_utc": "2026-10-19T15:45:44+00:00"
+}
