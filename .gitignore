@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+# run logs and model files stay local
+runs/
+*.gguf
+
+# editor / OS
+.vscode/
+.DS_Store
+Thumbs.db
