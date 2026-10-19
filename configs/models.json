@@ -1,0 +1,18 @@
+{
+  "llama_cpp": {
+    "build": "b11734",
+    "commit": "f3fb2fcdbc93a8f677e893b8dbd36462b3190ffd"
+  },
+  "models": {
+    "olmo3-7b-instruct": {
+      "hf_repo": "allenai/Olmo-3-7B-Instruct",
+      "revision": "6e5971d9eba42665f5bd5a0fcf047f299ce1dccc",
+      "quant": "Q8_0"
+    },
+    "olmo3-7b-think": {
+      "hf_repo": "allenai/Olmo-3-7B-Think",
+      "revision": "d97e442d7cc678210054dbcc9b440894d62c89a4",
+      "quant": "Q8_0"
+    }
+  }
+}
