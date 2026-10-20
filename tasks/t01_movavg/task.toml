@@ -1,0 +1,29 @@
+[task]
+id = "t01_movavg"
+function = "movavg"
+trap = "indexing"
+
+# Mean of k doubles: numpy (pairwise) and Octave (sequential) can differ by a few ulps.
+# atol covers results that are almost zero, where a relative bound alone is too strict.
+[tolerance]
+rtol = 1e-12
+atol = 1e-12
+
+# The expected output is a 1xM row. A 1-D result of the same length is accepted
+# (orientation is not what this task tests); an Mx1 column is not.
+[shape]
+vector_ok = true
+
+# Arguments passed to the model's function as Python ints rather than floats.
+[inputs]
+as_int = ["k"]
+
+# Octave results of common wrong translations -> failure signature they indicate.
+[known_wrong]
+drop_first = "shifted-output"
+drop_last = "shifted-output"
+window_km1 = "window-mismatch"
+
+# Ambiguity variant: reading A is `expected`, reading B is below.
+[readings]
+same = "output keeps the input length, zero-padded at the edges"

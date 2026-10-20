@@ -6,7 +6,7 @@ Each task is a small MATLAB function. The model translates it to Python, and I c
 
 | # | Function | What it's testing | Main trap | Failure signature |
 |---|----------|-------------------|-----------|-------------------|
-| 1 | `movavg` | Indexing | 1-based loop, end-inclusive slices | `shifted-output` |
+| 1 | `movavg` | Indexing | 1-based loop, end-inclusive slices | `shifted-output`, `window-mismatch` |
 | 2 | `colscale_diff` | Array orientation | Default dimension of `min` and `diff` | `shape-mismatch`, `transposed-output` |
 | 3 | `simpson` | Integration bounds | Whether the endpoint is included | `endpoint-mismatch` |
 | 4 | `robust_stats` | Silent numerical drift | Defaults that differ between the two languages | `scale-mismatch`, `rounding-mismatch`, `sign-mismatch`, `wraparound-mismatch` |
@@ -17,7 +17,7 @@ Each task is a small MATLAB function. The model translates it to Python, and I c
 - **Pass.** The output matches Octave's within a stated tolerance (`numpy.testing.assert_allclose`). Tolerances are tight where only floating-point summation order can differ, and exact for integer and rounding outputs.
 - **Failure signature.** For each trap I also have Octave compute what the common wrong translation would give. If the model's output matches that wrong answer, the failure gets that signature. A signature is evidence of what the output looks like, not a diagnosis of the cause.
 - **Golden solution.** Each task has a correct numpy translation that the model never sees. Tests check that it passes and that every known-wrong variant fails, which shows the tolerances are neither too strict nor too loose.
-- **Ambiguity variant.** Each task has a second version of the spec with one thing deliberately left open. That version is scored on what the model does about it, not just whether it passes (see the end of this file).
+- **Ambiguity variant.** Each task has a second version of the spec with one thing deliberately left open. Because MATLAB source usually settles the question, these versions describe the function in words instead of showing code. They are scored on what the model does about the gap, not just whether it passes (see the end of this file).
 
 ---
 
@@ -40,9 +40,9 @@ end
 **What could go wrong**
 - MATLAB's `x(i:i+k-1)` includes both ends. The Python equivalent is `x[i:i+k]`, where the end is excluded. Translating the arithmetic literally gives a window of `k-1`.
 - The loop `1:(n-k+1)` becomes `range(n-k+1)` in Python. A model that keeps the MATLAB bounds, or starts at 1, drops or shifts values.
-- Wrong window and wrong loop bounds give a different length or shifted values, which is the `shifted-output` signature.
+- A loop that starts a step late or stops a step early drops the first or last average, so the output is one value short. That is the `shifted-output` signature. A window of `k-1` keeps the length but changes every value, which is `window-mismatch`.
 
-**Ambiguity variant.** The spec says "moving average with window k" but not whether the output keeps length `n` (padded at the edges) or shortens to `n-k+1`.
+**Ambiguity variant.** The spec describes the function in words ("the moving average of a row vector using a window of `k` consecutive values") and doesn't say whether the output keeps length `n` (zero-padded at the edges) or shortens to `n-k+1`. The MATLAB source would settle the question, so this version leaves it out. The two readings are checked against Octave's `loop` result and `conv(x, ones(1,k)/k, 'same')`. They coincide when `k = 1`, so the variant is only scored on cases with `k > 1`.
 
 ---
 
