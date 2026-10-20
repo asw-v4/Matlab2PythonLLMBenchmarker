@@ -28,6 +28,11 @@ def summarise(samples: list[dict]) -> dict:
         }
         if key[1] == "ambiguous":
             entry["outcomes"] = dict(Counter(e["outcome"] for e in evs))
+            coded = [e for e in evs if e["has_code"]]
+            entry["with_code"] = len(coded)
+            entry["documented_in_code"] = sum(bool(e.get("documented_in_code")) for e in coded)
+            entry["flagged_in_code"] = sum(bool(e.get("flagged_in_code")) for e in coded)
+            entry["quiet"] = sum(e["outcome"] == "silent" and not e.get("documented_in_code") for e in coded)
             entry["choices"] = dict(Counter(e["choice_summary"] for e in evs if e["choice_summary"]))
             entry["per_output_choices"] = {
                 out: dict(Counter(e["choices"][out] for e in evs if e["choices"] and out in e["choices"]))
@@ -58,6 +63,9 @@ def format_report(summary: dict) -> str:
             what = ", ".join(f"{k} x{v}" for k, v in sorted(g["outcomes"].items()))
             if g["choices"]:
                 what += "  |  chose: " + ", ".join(f"{k} x{v}" for k, v in sorted(g["choices"].items()))
+            if g.get("with_code"):
+                what += (f"  |  in the code's comments: documented {g['documented_in_code']}/{g['with_code']}, "
+                         f"flagged {g['flagged_in_code']}/{g['with_code']}, quiet {g['quiet']}/{g['with_code']}")
             passed = f"{g['passed']}/{g['n']}"
         lines.append(f"{task:20} {variant:10} {cond:7} {g['n']:>3} {passed:>5}  {what}")
     flagged = [(k, g) for k, g in summary["groups"].items() if g["unconfirmed"] or g["first_reply_differed"]]

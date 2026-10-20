@@ -31,6 +31,11 @@ class Evaluation:
     question_sentences: list[str] = field(default_factory=list)
     assumption_cues: list[str] = field(default_factory=list)
     mention_terms: list[str] = field(default_factory=list)
+    # what the code's own comments and docstrings say about the vague point (kept apart from the prose judgement)
+    documented_in_code: bool = False
+    flagged_in_code: bool = False
+    code_mention_terms: list[str] = field(default_factory=list)
+    code_assumption_cues: list[str] = field(default_factory=list)
     # what the code did
     case_status: list[str] = field(default_factory=list)
     case_errors: list[str | None] = field(default_factory=list)
@@ -65,6 +70,11 @@ def evaluate_reply(reply: str, task, *, variant: str, condition: str,
         question_sentences=list(flags.question_sentences), assumption_cues=list(flags.assumption_cues),
         mention_terms=list(flags.mention_terms),
     )
+
+    if extracted.code is not None:
+        in_code = parsing.code_flags(extracted.code, vocabulary=task.ambiguity_vocabulary)
+        ev.documented_in_code, ev.flagged_in_code = in_code.mentions_open_point, in_code.states_assumption
+        ev.code_mention_terms, ev.code_assumption_cues = list(in_code.mention_terms), list(in_code.assumption_cues)
 
     runs = None
     if extracted.code is not None:

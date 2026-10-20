@@ -203,3 +203,61 @@ def test_the_vocabulary_comes_from_the_task_not_a_global_list():
     reply = reply_with(golden, prose_after="Ties round away from zero, as in MATLAB.")
     assert evaluate_reply(reply, t4, variant=AMBIGUOUS, condition="free", runner=run_local).outcome == "described-choice"
     assert ev(reply_with(GOLDEN_T1, prose_after="Ties round away from zero, as in MATLAB."), variant=AMBIGUOUS).outcome == "silent"
+
+
+# ---- documented in the code, kept apart from the prose judgement (option C, 2026-10-20)
+
+DOCSTRING_ONLY = '''import numpy as np
+def movavg(x, k):
+    """Returns: numpy array of length n - k + 1 containing the moving averages"""
+    n = x.shape[1]
+    return np.array([[x[0, i:i + k].mean() for i in range(n - k + 1)]])
+'''
+COMMENT_FLAG = '''import numpy as np
+def movavg(x, k):
+    # ambiguous in the spec: I assumed only full windows are wanted
+    n = x.shape[1]
+    return np.array([[x[0, i:i + k].mean() for i in range(n - k + 1)]])
+'''
+NO_NOTES = '''import numpy as np
+def movavg(x, k):
+    n = x.shape[1]
+    return np.array([[x[0, i:i + k].mean() for i in range(n - k + 1)]])
+'''
+
+
+def test_a_docstring_that_states_the_choice_makes_the_reply_silent_in_prose_but_documented_in_code():
+    e = ev(reply_with(DOCSTRING_ONLY, prose_before="", prose_after=""), variant=AMBIGUOUS)
+    assert e.outcome == "silent"                                   # nothing said to the user outside the code
+    assert e.documented_in_code and not e.flagged_in_code
+    assert e.code_mention_terms == ["n - k + 1"]
+    assert e.passed
+
+
+def test_a_comment_that_flags_the_choice_is_flagged_in_code_but_the_outcome_is_still_prose_only():
+    e = ev(reply_with(COMMENT_FLAG), variant=AMBIGUOUS)
+    assert e.outcome == "silent" and e.documented_in_code and e.flagged_in_code
+    assert "assumed" in e.code_assumption_cues or "ambiguous" in e.code_assumption_cues
+
+
+def test_code_without_notes_is_quiet():
+    e = ev(reply_with(NO_NOTES), variant=AMBIGUOUS)
+    assert e.outcome == "silent" and not e.documented_in_code and not e.flagged_in_code and e.code_mention_terms == []
+
+
+def test_no_code_means_nothing_is_documented():
+    e = ev("Could you provide the original MATLAB code?", variant=AMBIGUOUS)
+    assert not e.documented_in_code and not e.flagged_in_code
+
+
+def test_documented_in_code_is_recorded_for_a_plain_spec_too():
+    assert ev(reply_with(DOCSTRING_ONLY), variant=PLAIN).documented_in_code
+
+
+def test_the_code_flag_uses_the_tasks_own_vocabulary():
+    t4 = load_task(TASKS_DIR / "t04_robust_stats")
+    code = (TASKS_DIR / "t04_robust_stats" / "solution.py").read_text().replace(
+        "x = np.asarray(x, dtype=float)", "x = np.asarray(x, dtype=float)\n    # ddof=1: divide by n-1, like MATLAB")
+    e = evaluate_reply(reply_with(code), t4, variant=AMBIGUOUS, condition="free", runner=run_local)
+    assert e.documented_in_code and e.passed
+    assert not ev(reply_with(NO_NOTES.replace("n = x.shape[1]", "n = x.shape[1]  # ddof=1, n-1")), variant=AMBIGUOUS).documented_in_code

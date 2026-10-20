@@ -260,3 +260,65 @@ def test_flags_record_what_matched_for_review():
 def test_empty_reply():
     f = flags("", T1_VOCAB)
     assert not (f.asks_clarifying_question or f.states_assumption or f.mentions_open_point)
+
+
+# ---- what the code says about itself: comments and docstrings
+
+DOC = '''def movavg(x, k):
+    """
+    Computes the moving average.
+    Returns: numpy array of length n - k + 1 containing the moving averages
+    """
+    return x  # keep it simple
+'''
+
+
+def test_notes_are_the_comments_and_docstrings_without_the_code():
+    notes = ps.code_notes(DOC)
+    assert "Computes the moving average." in notes and "length n - k + 1" in notes and "keep it simple" in notes
+    assert "return x" not in notes and "def movavg" not in notes and '"""' not in notes
+
+
+def test_single_and_double_triple_quotes_and_prefixes_are_docstrings():
+    assert "single" in ps.code_notes("def f():\n    '''single'''\n")
+    assert "raw" in ps.code_notes('def f():\n    r"""raw\\d"""\n')
+
+
+def test_a_hash_inside_a_string_is_not_a_comment():
+    assert ps.code_notes("s = 'n-1 # not a comment'\nt = \"# nor this\"\n") == ""
+
+
+def test_ordinary_strings_are_not_docstrings():
+    assert ps.code_notes('raise ValueError("k must be between 1 and n")\n') == ""
+
+
+def test_code_with_a_syntax_error_still_yields_its_notes():
+    assert "Returns: numpy array of length n - k + 1" in ps.code_notes('def f(x):\n    """Returns: numpy array of length n - k + 1"""\n    x flat = x[0]\n')
+
+
+def test_code_cut_off_mid_string_still_yields_what_came_before():
+    notes = ps.code_notes('# first note\ndef f(x):\n    """never closed\n    return x +')
+    assert "first note" in notes and "never closed" in notes
+
+
+def test_no_comments_no_notes():
+    assert ps.code_notes("def f(x):\n    return x\n") == ""
+    assert ps.code_notes("") == ""
+
+
+def test_the_code_is_judged_with_the_same_rules_as_prose():
+    f = ps.code_flags(DOC, T1_VOCAB + ["n - k + 1"])
+    assert f.mentions_open_point and not f.states_assumption and "n - k + 1" in f.mention_terms
+    g = ps.code_flags("def f(x):\n    # assuming only full windows are wanted\n    return x\n", T1_VOCAB)
+    assert g.mentions_open_point and g.states_assumption and "assuming" in g.assumption_cues
+
+
+def test_comments_that_say_nothing_about_the_vague_point_are_not_documentation():
+    f = ps.code_flags("def f(x):\n    # reshape for easier computation\n    return x\n", T1_VOCAB)
+    assert not f.mentions_open_point and not f.states_assumption
+
+
+def test_the_replys_prose_and_its_code_notes_are_separate_things():
+    reply = "```python\ndef f(x):\n    # full windows only\n    return x\n```\nCONFIDENCE: 50"
+    assert not ps.text_flags(reply, T1_VOCAB).mentions_open_point          # the prose says nothing
+    assert ps.code_flags(ps.extract_code(reply, "f").code, T1_VOCAB).mentions_open_point

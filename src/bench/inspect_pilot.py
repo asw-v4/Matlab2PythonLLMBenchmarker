@@ -145,6 +145,14 @@ def ambiguity_summary() -> Metric:
             out["outcome_" + label.replace("-", "_")] = (sum(v.get("outcome") == label for v in amb) / n) if n else None
         chosen = [v.get("choice") for v in amb if v.get("choice")]
         out["chose_reading_a"] = (sum(c == "A" for c in chosen) / len(chosen)) if chosen else None
+        # what the code's own comments and docstrings say, among the samples that have code. "quiet" is the
+        # strict reading of "quietly picked": silent in the prose AND nothing about it in the code.
+        with_code = [v for v in amb if v.get("documented_in_code") is not None]
+        k = len(with_code)
+        out["with_code"] = k
+        out["documented_in_code"] = (sum(v["documented_in_code"] == 1 for v in with_code) / k) if k else None
+        out["flagged_in_code"] = (sum(v.get("flagged_in_code") == 1 for v in with_code) / k) if k else None
+        out["quiet"] = (sum(v.get("outcome") == "silent" and v["documented_in_code"] == 0 for v in with_code) / k) if k else None
         return out
     return compute
 
@@ -168,7 +176,10 @@ def translation_scorer(runner: Callable | None = None, runner_cfg=None):
         first = await evaluate(conf["first_reply"]) if conf and conf.get("first_reply") else None
         return Score(
             value={"passed": int(ev.passed), "signature": ev.signature, "confidence": ev.confidence,
-                   "outcome": ev.outcome, "choice": ev.choice_summary},
+                   "outcome": ev.outcome, "choice": ev.choice_summary,
+                   # None when there is no code to read comments from
+                   "documented_in_code": int(ev.documented_in_code) if ev.has_code else None,
+                   "flagged_in_code": int(ev.flagged_in_code) if ev.has_code else None},
             answer=ev.outcome or ev.signature,
             explanation=f"{meta['task_id']} {meta['variant']}: {ev.outcome or ('pass' if ev.passed else ev.signature)}",
             metadata={"evaluation": ev.as_dict(), "first_reply_evaluation": first.as_dict() if first else None,

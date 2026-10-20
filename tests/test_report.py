@@ -91,3 +91,24 @@ def test_the_text_report_mentions_each_group_and_the_calibration_lines():
 def test_report_handles_missing_calibration_numbers():
     text = format_report(summarise([sample("no idea")]))        # no confidence at all
     assert "scored 0" in text and "Brier -" in text
+
+
+DOCUMENTED = ("import numpy as np\n"
+              "def movavg(x, k):\n"
+              "    \"\"\"Returns: array of length n - k + 1\"\"\"\n"
+              "    n = x.shape[1]\n"
+              "    return np.array([[x[0, i:i + k].mean() for i in range(n - k + 1)]])\n")
+
+
+def test_the_report_counts_documentation_in_code_and_quiet_replies():
+    s = summarise([sample(reply_with(GOLDEN), AMBIGUOUS), sample(reply_with(DOCUMENTED), AMBIGUOUS),
+                   sample("Do you mean the full windows only, or the same length as the input?", AMBIGUOUS)])
+    g = s["groups"][("t01_movavg", "ambiguous", "free")]
+    assert g["with_code"] == 2 and g["documented_in_code"] == 1 and g["quiet"] == 1 and g["flagged_in_code"] == 0
+    text = format_report(s)
+    assert "documented 1/2" in text and "quiet 1/2" in text and "flagged 0/2" in text
+
+
+def test_the_report_leaves_the_code_line_out_when_no_ambiguous_reply_had_code():
+    text = format_report(summarise([sample("Do you mean the full windows only, or the same length?", AMBIGUOUS)]))
+    assert "in the code's comments" not in text

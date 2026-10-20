@@ -7,7 +7,11 @@ function actually returns), and the pilot's replies are checked by hand (scripts
 """
 from __future__ import annotations
 
+import ast
+import inspect
+import io
 import re
+import tokenize
 from dataclasses import dataclass, field
 
 FENCE = re.compile(r"```[ \t]*([A-Za-z0-9_+-]*)[ \t]*\r?\n(.*?)```", re.DOTALL)
@@ -146,6 +150,59 @@ class TextFlags:
     question_sentences: tuple[str, ...] = field(default=())
     assumption_cues: tuple[str, ...] = field(default=())
     mention_terms: tuple[str, ...] = field(default=())
+
+
+# ---- what the code itself says: its comments and docstrings --------------------------------------
+#
+# The judgements above read the prose only. A reply that is just a code block can still say what it did in a
+# docstring ("Returns: array of length n - k + 1"). That is recorded separately (documented_in_code), not
+# folded into the outcome, so both "said it to the user" and "wrote it in the code" can be reported.
+
+_TRIPLE = ('"""', "'''")
+_COMMENT_RE = re.compile(r"#(.*)")
+_DOCSTRING_RE = re.compile(r'("""|\'\'\')(.*?)(\1|\Z)', re.DOTALL)
+
+
+def _string_value(token: str) -> str:
+    try:
+        value = ast.literal_eval(token)
+        if isinstance(value, str):
+            return value
+    except (ValueError, SyntaxError):
+        pass
+    body = token.lstrip("rRbBuUfF")
+    return body[3:-3] if len(body) >= 6 else body[3:]
+
+
+def code_notes(code: str) -> str:
+    """The comments and triple-quoted strings (docstrings) in Python code, one note per line, code left out.
+
+    Uses the tokenizer, so a '#' inside a string is not a comment and code with a syntax error still works. If the
+    code is cut off mid-token, patterns are used for what the tokenizer didn't reach. Any triple-quoted string
+    counts, not only the first statement of a function.
+    """
+    notes: list[str] = []
+    try:
+        for tok in tokenize.generate_tokens(io.StringIO(code).readline):
+            if tok.type == tokenize.COMMENT:
+                notes.append(tok.string.lstrip("#").strip())
+            elif tok.type == tokenize.STRING and tok.string.lstrip("rRbBuUfF").startswith(_TRIPLE):
+                notes.append(inspect.cleandoc(_string_value(tok.string)))
+    except (tokenize.TokenError, IndentationError, SyntaxError):
+        for m in _DOCSTRING_RE.finditer(code):
+            note = inspect.cleandoc(m.group(2))
+            if note not in notes:
+                notes.append(note)
+        for m in _COMMENT_RE.finditer(_DOCSTRING_RE.sub("", code)):
+            note = m.group(1).strip()
+            if note and note not in notes:
+                notes.append(note)
+    return "\n".join(n for n in notes if n)
+
+
+def code_flags(code: str, vocabulary=None) -> "TextFlags":
+    """The same judgement as text_flags, applied to the code's comments and docstrings."""
+    return text_flags(code_notes(code), vocabulary)
 
 
 def text_flags(reply: str, vocabulary=None) -> TextFlags:

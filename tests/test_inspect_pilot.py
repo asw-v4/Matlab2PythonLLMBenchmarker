@@ -86,7 +86,8 @@ def test_a_correct_model_passes_and_two_requests_are_made_per_sample(tmp_path):
     by_id = {s.id: s for s in log.samples}
     plain, amb = by_id["t01_movavg:plain:free"], by_id["t01_movavg:ambiguous:free"]
     assert plain.scores[ip.SCORER_NAME].value == {"passed": 1, "signature": "pass", "confidence": 90.0,
-                                                  "outcome": None, "choice": None}
+                                                  "outcome": None, "choice": None,
+                                                  "documented_in_code": 0, "flagged_in_code": 0}
     assert amb.scores[ip.SCORER_NAME].value["outcome"] == "silent" and amb.scores[ip.SCORER_NAME].value["choice"] == "A"
 
 
@@ -241,3 +242,39 @@ def test_the_default_runner_uses_the_real_sandbox_from_inside_inspect(tmp_path):
                             max_samples=1, display="none")
     log = read_eval_log(logs[0].location)
     assert log.status == "success" and log.samples[0].scores[ip.SCORER_NAME].value["passed"] == 1
+
+
+# ---- documented in code, in the metrics (option C)
+
+def test_the_ambiguity_summary_reports_what_the_code_says_among_samples_with_code():
+    scores = [
+        ss({"outcome": "silent", "choice": "A", "documented_in_code": 1, "flagged_in_code": 0}, "ambiguous"),
+        ss({"outcome": "silent", "choice": "A", "documented_in_code": 0, "flagged_in_code": 0}, "ambiguous"),
+        ss({"outcome": "silent", "choice": "same", "documented_in_code": 0, "flagged_in_code": 0}, "ambiguous"),
+        ss({"outcome": "stated-assumption", "choice": "A", "documented_in_code": 1, "flagged_in_code": 1}, "ambiguous"),
+        ss({"outcome": "asked", "choice": None, "documented_in_code": None, "flagged_in_code": None}, "ambiguous"),
+    ]
+    out = ip.ambiguity_summary()(scores)
+    assert out["ambiguous_n"] == 5 and out["with_code"] == 4
+    assert out["documented_in_code"] == 0.5 and out["flagged_in_code"] == 0.25
+    assert out["quiet"] == 0.5                       # silent in the prose AND nothing in the code: 2 of the 4 with code
+    assert out["outcome_silent"] == 0.6              # prose-only outcomes are over all 5, as before
+
+
+def test_the_ambiguity_summary_with_no_code_at_all():
+    out = ip.ambiguity_summary()([ss({"outcome": "asked", "documented_in_code": None, "flagged_in_code": None}, "ambiguous")])
+    assert out["with_code"] == 0 and out["documented_in_code"] is None and out["quiet"] is None
+
+
+def test_a_docstring_only_reply_through_inspect_is_silent_in_prose_and_documented_in_code(tmp_path):
+    code = ('import numpy as np\n'
+            'def movavg(x, k):\n'
+            '    """Returns: numpy array of length n - k + 1"""\n'
+            '    n = x.shape[1]\n'
+            '    return np.array([[x[0, i:i + k].mean() for i in range(n - k + 1)]])\n')
+    with FakeServer(lambda b, n: reply_with(code, confidence="CONFIDENCE: 70")) as srv:
+        log = run(srv, tmp_path)
+    amb = next(s for s in log.samples if s.metadata["variant"] == "ambiguous").scores[ip.SCORER_NAME].value
+    assert amb["outcome"] == "silent" and amb["documented_in_code"] == 1 and amb["flagged_in_code"] == 0
+    m = metrics(log)
+    assert m["outcome_silent"] == 1.0 and m["documented_in_code"] == 1.0 and m["quiet"] == 0.0 and m["with_code"] == 1
