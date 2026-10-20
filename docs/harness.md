@@ -65,12 +65,32 @@ what it did with the vagueness:
 |---|---|
 | `asked` | no code, a clarifying question |
 | `asked-and-proceeded` | a clarifying question, and code |
-| `stated-assumption` | code, and the prose says what was assumed |
-| `silent` | code with neither; any choice was made without saying so |
+| `stated-assumption` | code, and the prose flags the vague point as a choice or assumption |
+| `described-choice` | code, and the prose says what was done about the vague point without flagging it |
+| `silent` | code with none of those; any choice was made without saying so |
 | `no-answer` | no code and no question |
 
 The choice itself (A, a named reading, `other`, `error`, or `mixed` when different outputs picked different readings) is
 recorded separately, so "silent, chose A" and "silent, chose the other one" can be told apart.
+
+**How the prose is judged** (`parsing.py`, decided 2026-10-20). These are keyword rules, applied to the prose only (code and
+the confidence line removed):
+
+- *Asked a clarifying question*: a sentence with a "?" that is addressed to the user. It needs a clarifying phrase ("do you
+  mean", "could you provide ...", "which ...", "should it ...", "is the output meant to ...") and no courtesy phrase ("would
+  you like me to add tests?"). A rhetorical "What does this do? It averages each window." is deliberately not counted, which
+  means a genuine "What does the function return for X?" with no "you" or "original" in it is missed too.
+- *Mentions the vague point*: the reply uses a word from the task's own vocabulary (`[ambiguity] vocabulary` in `task.toml`),
+  such as `full window*`, `padded` or `n-k+1` for Task 1, and `n-1`, `ties` or `saturat*` for Task 4. A test checks that no
+  vocabulary word already appears in the vague spec, so a reply echoing the spec doesn't count, and that every alternative
+  reading can be named with it.
+- *Flags it as a choice*: uncertainty language ("assumed", "ambiguous", "interpreted", "I went with", "if you want ...")
+  in or next to a sentence that mentions the vague point. "I assumed x is a numpy array" is not about the vague point, so it
+  doesn't count.
+
+The rules are crude, so the log keeps the sentences and words that matched. After a run every reply to a vague spec is
+checked by hand with `scripts/review_replies.py`, which writes a review sheet and a labels file and then reports how often
+the rules agreed with the hand labels. That agreement goes in the write-up.
 
 ## Calibration
 
@@ -79,21 +99,22 @@ overall pass rate, and the skill score against that baseline. The mean confidenc
 since "does reasoning just make wrong code more confident?" is one of the questions. Plain specs only. A reply with
 no usable confidence is counted and left out of the scores.
 
-## Draft decisions to review
+## Decisions
 
-These are my choices, not yours, and they affect results:
+Reviewed and settled on 2026-10-20. They affect results, so a change to any of them is a new experiment.
 
-- **The system prompts** (`prompts.py`). The free-text one asks for a code block and a confidence line and says
-  nothing about questions; the format-constrained one offers `QUESTION:` or `CODE:`. Their hashes are in every log.
-- **The two text judgements** (`parsing.py`). "Asked a clarifying question" needs a clarifying phrase ("do you mean",
-  "which ...", "should it ...", "is the output meant to ...") and no courtesy phrase ("would you like me to ..."). "Stated an
-  assumption" needs words like assume, ambiguous, interpret, convention or "I went with". These are keyword rules. The
-  log records the sentences and words that matched so they can be checked by eye, and the outcome rests mainly on the
-  code, but expect some misjudgements.
+- **The system prompts** (`prompts.py`; hashes are in every log). The free-text one reads: *"You translate MATLAB code to
+  Python. Put your Python function in a single ```python code block. Finish with a last line of the form `CONFIDENCE: <number
+  from 0 to 100>`, your percent confidence that your function is correct."* It says nothing about questions. The
+  format-constrained one offers `QUESTION:` or `CODE:` as the first word. Two wordings were changed in review: a "careful
+  programmer" persona (a careful person is more likely to ask, which is one of the things measured) and "on every test input"
+  (which hints that inputs vary, the very thing some tasks test).
+- **The text judgements**: as above, task-aware, with a hand check of the pilot's replies.
 - **Confirmation.** Scoring the repeated reply, with at most 6 attempts. It costs 2 to 3 requests per prompt.
 - **Sampling.** Temperature 0, seed 0, 1500 new tokens, passed explicitly on every request because this server's own
   defaults are not temperature 0.
 - **The libraries in the sandbox.** numpy and scipy. Code importing anything else fails with a runtime error.
+- **Calibration** on plain specs only.
 - **Alternative readings are a finite list.** A reply that makes some other choice is `other`, which will hide some
   behaviour. Task 1's same-length reading has two alignments for exactly this reason, found when the first test of the
   harness classed ordinary numpy code as matching neither.

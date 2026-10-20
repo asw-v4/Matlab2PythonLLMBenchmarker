@@ -10,7 +10,7 @@ I wanted to know how well a small local LLM can translate MATLAB code to Python.
 1. **Pass rate.** Does the Python give the same numbers as the original, within a stated tolerance?
 2. **How it fails.** Off-by-one shifts, transposed arrays, wrong integration endpoints, rounding quirks. I label these by what the output looks like, not by diagnosing the cause. That would need reading the code.
 3. **Calibration.** The model ends each answer with `CONFIDENCE: 0-100`. Does that match whether the tests passed? Scored with a Brier score against a base-rate baseline.
-4. **Ambiguity.** Some task specs are deliberately vague. Does the model ask what I meant, or quietly pick an answer?
+4. **Ambiguity.** Some task specs are deliberately vague. Does the model ask what I meant, say what it assumed, just describe what it did, or quietly pick an answer? Which answer it picked comes from the code. Whether and how it said so comes from keyword rules on its text, which I then check by hand.
 
 ## Ground rules
 - Everything runs locally. Models are served by llama.cpp's `llama-server` at `localhost:8080/v1`, with no hosted APIs.
