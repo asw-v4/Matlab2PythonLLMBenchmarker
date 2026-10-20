@@ -73,3 +73,21 @@ def test_every_real_spec_builds_a_valid_conversation():
     for spec in sorted(TASKS.glob("*/spec*.md")):
         msgs = p.build_messages("free", spec.read_text(encoding="utf-8"))
         assert len(msgs) == 2 and msgs[1]["content"].strip()
+
+
+@pytest.mark.parametrize("condition", sorted(p.CONDITIONS))
+def test_the_role_is_neutral_and_the_confidence_question_does_not_hint_at_varied_inputs(condition):
+    low = p.system_prompt(condition).lower()
+    for phrase in ("careful", "expert", "skilled", "experienced", "every test input", "test input", "edge case"):
+        assert phrase not in low, phrase
+    assert low.startswith("you translate matlab code to python.")
+    assert "your percent confidence that your function is correct." in low
+
+
+def test_the_exact_prompts_are_pinned():
+    # a change here changes every result, so it must be a deliberate edit of this test too
+    assert p.SYSTEM_FREE == ("You translate MATLAB code to Python. Put your Python function in a single ```python code "
+                             "block. Finish with a last line of the form `CONFIDENCE: <number from 0 to 100>`, your "
+                             "percent confidence that your function is correct.")
+    assert p.sha256(p.SYSTEM_FREE) == "7a8771cfed61c0a3dfeb8cca089044db8982df6cdb0b4b7668e3ddaf203ce95e"
+    assert p.sha256(p.SYSTEM_FORMAT) == "b59984771b511324ef4fbf0bcaebbc46cd31b1bff03c440e34c8ff0375bea8f1"

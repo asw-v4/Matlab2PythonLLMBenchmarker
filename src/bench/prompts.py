@@ -4,8 +4,10 @@ Every sample is its own fresh conversation: one system message and one user mess
 spec, never anything from another sample. The system message is always present, so the model's
 behaviour doesn't depend on a template default (see the README).
 
-DRAFT wording: the system prompts below are a design decision to review. Their SHA-256 goes into
-every run log, so results are tied to the exact text.
+The system prompts were reviewed on 2026-10-20: a neutral one-line role (a "careful programmer" persona
+could push the model toward asking), and a confidence question that doesn't say "on every test input"
+(which would hint that inputs vary, the very thing some tasks test). Their SHA-256 goes into every run
+log, so results are tied to the exact text.
 """
 from __future__ import annotations
 
@@ -14,21 +16,20 @@ import hashlib
 # Primary condition: free text. It asks for code and a confidence line, and says nothing about
 # questions, so asking one is the model's own choice.
 SYSTEM_FREE = (
-    "You are a careful programmer who translates MATLAB to Python. "
+    "You translate MATLAB code to Python. "
     "Put your Python function in a single ```python code block. "
     "Finish with a last line of the form `CONFIDENCE: <number from 0 to 100>`, your percent confidence "
-    "that your function gives the same results as the MATLAB original on every test input."
+    "that your function is correct."
 )
 
 # Control condition: the format makes asking a question an explicit option.
 SYSTEM_FORMAT = (
-    "You are a careful programmer who translates MATLAB to Python. "
+    "You translate MATLAB code to Python. "
     "Begin your reply with exactly one of these two markers. "
     "`QUESTION:` followed by one question for the user, and nothing else, if you cannot write the function "
     "without an answer. "
     "`CODE:` followed by your Python function in a single ```python code block, and then a last line of the form "
-    "`CONFIDENCE: <number from 0 to 100>`, your percent confidence that your function gives the same results "
-    "as the MATLAB original on every test input."
+    "`CONFIDENCE: <number from 0 to 100>`, your percent confidence that your function is correct."
 )
 
 CONDITIONS = {"free": SYSTEM_FREE, "format": SYSTEM_FORMAT}
