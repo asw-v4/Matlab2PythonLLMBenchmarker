@@ -1,3 +1,3 @@
-I have a MATLAB function `movavg(x, k)` that returns the moving average of a row vector `x` using a window of `k` consecutive values. I don't have the source to hand.
+I need a Python version of a MATLAB function I use called `movavg(x, k)`. It takes a row vector `x` and works out the moving average using a window of `k` values. I've lost the original code, sadly.
 
-Write the equivalent Python function `movavg(x, k)`. `x` is a 2-D numpy array of shape `(1, n)` and `k` is an int with `1 <= k <= n`. Return the result as a numpy array.
+Could you write `movavg(x, k)` in Python for me? `x` comes in as a 2-D numpy array of shape `(1, n)`, `k` is an int somewhere between 1 and `n`, and I'd like a numpy array back.
