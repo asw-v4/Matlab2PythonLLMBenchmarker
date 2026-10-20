@@ -136,6 +136,11 @@ def test_scale_needs_the_zeros_to_stay_zero():
     assert generic_signature(np.array([[1.0, 2.0, 4.0]]), e)[0] == "value-mismatch"
 
 
+def test_a_scale_needs_at_least_two_nonzero_values():
+    assert generic_signature(np.array([[0.0, 6.0]]), np.array([[0.0, 3.0]]))[0] == "value-mismatch"
+    assert generic_signature(np.array([[0.0, 6.0, 2.0]]), np.array([[0.0, 3.0, 1.0]]))[0] == "scale-mismatch"
+
+
 def test_square_matrix_transposed():
     e = np.array([[1.0, 2.0], [3.0, 4.0]])
     assert generic_signature(e.T.copy(), e)[0] == "permuted-output"      # same shape, same values: not a shape problem
@@ -158,3 +163,14 @@ def test_sample_label_is_the_commonest_failing_label_and_ties_go_alphabetical():
     s = classify_sample(runs(["ddof0", None, None, "wraparound", None]), task)    # a tie: scale vs wraparound
     assert s.signature == sorted([ddof, wrap])[0]
     assert rnd == "rounding-mismatch"
+
+
+# ---- single numbers
+
+def test_a_scalar_against_a_1x1_key_is_judged_on_its_value_not_its_shape():
+    e = np.array([[2.0]])
+    assert generic_signature(np.float64(3.0), e)[0] == "value-mismatch"
+    assert generic_signature(np.array(4.0), e)[0] == "value-mismatch"        # twice the key, but one number proves nothing
+    assert generic_signature(np.array([5.0]), e)[0] == "value-mismatch"
+    assert generic_signature(np.array(np.nan), e)[0] == "nan-output"
+    assert generic_signature(np.array([1.0, 2.0]), e)[0] == "shape-mismatch"  # two numbers are not one

@@ -51,6 +51,8 @@ def generic_signature(actual, expected) -> tuple[str, str]:
     if a.dtype == object or a.dtype.kind not in "biufc":
         return "bad-output", "not numeric"
     a, e = a.astype(float), e.astype(float)
+    if a.shape != e.shape and a.size == 1 and e.size == 1:      # a single number is a single number
+        a = a.reshape(e.shape)
     if np.isnan(a).any() and not np.isnan(e).any():
         return "nan-output", "contains NaN"
 
@@ -69,7 +71,8 @@ def generic_signature(actual, expected) -> tuple[str, str]:
     if np.allclose(np.sort(a.ravel()), np.sort(e.ravel()), **STRUCTURAL):
         return "permuted-output", "same values in a different order"
     nonzero = e != 0
-    if nonzero.any() and np.isfinite(a).all() and np.allclose(a[~nonzero], 0.0, atol=STRUCTURAL["atol"]):
+    # a constant ratio is only evidence of a scaling if there are at least two values to share it
+    if nonzero.sum() >= 2 and np.isfinite(a).all() and np.allclose(a[~nonzero], 0.0, atol=STRUCTURAL["atol"]):
         ratios = a[nonzero] / e[nonzero]
         if np.allclose(ratios, ratios[0], rtol=1e-6) and not np.isclose(ratios[0], 1.0, rtol=1e-9):
             return "scale-mismatch", f"key times {ratios[0]:.6g}"
