@@ -34,12 +34,13 @@ as_int = ["N"]
 ravel_rowmajor = "permuted-output"
 coef_order_reversed = "permuted-output"
 
-# Ambiguity variant: a smaller function, rk4_traj(h, N), described in words, no code.
-# Reading A is the `Y` output of the key (the start state is column 1); reading B drops it.
-# Scored on `Y` only.
+# Ambiguity variant: the same function, described in words instead of shown as code. Reading A is the
+# key. Each reading below changes one thing and covers only the outputs it concerns.
 [ambiguity]
-function = "rk4_traj"
-outputs = ["Y"]
+function = "rk4_fit"
+outputs = ["Y", "c", "yflat"]
 
 [readings]
-no_initial = "only the N states after the start, without the initial condition"
+no_initial = "the returned states are only the N after the start; the fit uses their own times (outputs Y, c, yflat)"
+coef_highest_first = "'the coefficients of the quadratic' listed highest power first, like np.polyfit (output c)"
+row_by_row = "'flattened into a single column' reading row by row, like numpy's ravel (output yflat)"

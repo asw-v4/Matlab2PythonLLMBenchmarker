@@ -212,21 +212,69 @@ def test_np_linalg_solve_cannot_be_used_for_the_fit(case):
         np.linalg.solve(A, case.expected["Y"][0])
 
 
-# ---- ambiguity variant
+# ---- ambiguity variant: the same function, described in words
+
+# reading -> (the outputs it concerns, the known-wrong variant it is the same computation as, if any)
+READINGS = {
+    "no_initial": ({"Y", "c", "yflat"}, None),
+    "coef_highest_first": ({"c"}, "coef_order_reversed"),
+    "row_by_row": ({"yflat"}, "ravel_rowmajor"),
+}
+
+
+def tol_for(name):
+    return {**{"rtol": KW["rtol"], "atol": KW["atol"]}, **KW["overrides"].get(name, {})}
+
+
+def test_ambiguity_is_the_same_function_with_all_three_outputs():
+    assert TASK.meta["ambiguity"] == {"function": "rk4_fit", "outputs": NAMES}
+    assert TASK.meta["ambiguity"]["function"] == TASK.meta["task"]["function"]
+    assert set(READINGS) == set(TASK.meta["readings"])
+
 
 @pytest.mark.parametrize("case", CASES)
-def test_no_initial_reading_is_the_key_without_its_first_column(case):
-    reading = case.readings["no_initial"]
-    assert set(reading) == {"Y"}
-    N = case.inputs["N"]
-    assert reading["Y"].shape == (2, N)
-    np.testing.assert_array_equal(reading["Y"], case.expected["Y"][:, 1:])
-    assert not compare(reading["Y"], case.expected["Y"], rtol=1e-12, atol=1e-12).passed   # different shape
-    assert compare(SOL.rk4_traj(case.inputs["h"], N), case.expected["Y"], rtol=1e-12, atol=1e-12).passed
+@pytest.mark.parametrize("reading", sorted(READINGS))
+def test_each_reading_concerns_only_its_outputs(reading, case):
+    assert set(case.readings[reading]) == READINGS[reading][0]
 
 
-def test_ambiguity_function_is_declared():
-    assert TASK.meta["ambiguity"] == {"function": "rk4_traj", "outputs": ["Y"]}
+@pytest.mark.parametrize("case", CASES)
+@pytest.mark.parametrize("reading", ["coef_highest_first", "row_by_row"])
+def test_single_output_readings_equal_the_matching_wrong_variant(reading, case):
+    outs, variant = READINGS[reading]
+    for n in outs:
+        np.testing.assert_array_equal(case.readings[reading][n], case.wrong[variant][n])
+
+
+@pytest.mark.parametrize("case", CASES)
+def test_no_initial_reading_drops_the_first_column_and_refits_on_its_own_times(case):
+    r = case.readings["no_initial"]
+    N, h = case.inputs["N"], case.inputs["h"]
+    assert r["Y"].shape == (2, N) and r["c"].shape == (3, 1) and r["yflat"].shape == (2 * N, 1)
+    np.testing.assert_array_equal(r["Y"], case.expected["Y"][:, 1:])
+    t = (np.arange(N) + 1) * h                                                  # h, 2h, ..., N*h
+    A = np.column_stack([np.ones(N), t, t ** 2])
+    c = np.linalg.lstsq(A, r["Y"][0], rcond=None)[0]
+    np.testing.assert_allclose(r["c"].ravel(), c, **tol_for("c"))
+    np.testing.assert_array_equal(r["yflat"].ravel(), r["Y"].ravel(order="F"))
+
+
+def test_no_initial_fit_is_conditioned_well_enough_for_the_tolerance_on_c():
+    for c in TASK.cases:
+        cond_b = MAT[f"case{c.index:02d}_check_cond_no_initial"].item()
+        smallest = np.abs(c.readings["no_initial"]["c"]).min()
+        budget = TASK.tolerance_overrides["c"]["atol"] + TASK.tolerance_overrides["c"]["rtol"] * smallest
+        assert budget >= 1000 * cond_b ** 2 * EPS, f"case {c.index}: cond {cond_b:.3g}"
+
+
+@pytest.mark.parametrize("case", CASES)
+@pytest.mark.parametrize("reading", sorted(READINGS))
+def test_every_reading_differs_from_the_key_and_from_the_golden_answer_on_every_output(reading, case):
+    golden = dict(zip(NAMES, SOL.rk4_fit(case.inputs["h"], case.inputs["N"])))
+    for n in READINGS[reading][0]:
+        got = case.readings[reading][n]
+        assert not compare(got, case.expected[n], vector_ok=True, **tol_for(n)).passed, n
+        assert not compare(got, golden[n], vector_ok=True, **tol_for(n)).passed, n
 
 
 # ---- specs
@@ -240,11 +288,27 @@ def test_spec_has_no_hints_in_the_code():
     assert "least squares" not in spec.lower() and "column-major" not in spec.lower()
 
 
-def test_ambiguous_spec_leaves_the_initial_state_open_and_gives_nothing_away():
-    amb = (TASK_DIR / "spec_ambiguous.md").read_text().lower()
-    assert "rk4_traj(h, n)" in amb and "for `n` steps" in amb
-    for banned in ("initial", "include", "n+1", "n + 1", "excluding", "without the", "polyfit", "flatten",
-                   "least", "coefficient", "```"):
+def test_ambiguous_spec_is_the_same_task_in_words_and_settles_nothing():
+    spec = (TASK_DIR / "spec.md").read_text()
+    raw = (TASK_DIR / "spec_ambiguous.md").read_text()
+    amb = raw.lower()
+
+    # same function, signature, input types and return order as the plain spec
+    for text in (spec, raw):
+        for must in ("rk4_fit(h, N)", "(Y, c, yflat)", "at least 3", "numpy arrays"):
+            assert must in text, must
+
+    # described in words: the equation, the method, the three results
+    for phrase in ("y'' = -y", "fourth-order runge-kutta", "fixed step size `h`", "for `n` steps",
+                   "one column per time step", "quadratic that best fits", "flattened into a single column"):
+        assert phrase in amb, phrase
+    for banned in ("```", "zeros(", "linspace", "ones(", "t.^2", "y(:", "\\"):
         assert banned not in amb, banned
-    for text in (amb, (TASK_DIR / "spec.md").read_text().lower()):
+
+    # nothing that settles any of the three open points
+    for banned in ("initial", "include", "excluding", "n+1", "n + 1", "without the", "after the start",
+                   "polyfit", "highest", "lowest", "descending", "ascending", "constant term", "intercept",
+                   "column by column", "row by row", "column-major", "row-major", "ravel", "least squares"):
+        assert banned not in amb, banned
+    for text in (amb, spec.lower()):
         assert "expected" not in text

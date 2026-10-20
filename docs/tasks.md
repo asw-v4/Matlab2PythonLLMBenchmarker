@@ -17,7 +17,7 @@ Each task is a small MATLAB function. The model translates it to Python, and I c
 - **Pass.** The output matches Octave's within a stated tolerance (`numpy.testing.assert_allclose`). Tolerances are tight where only floating-point summation order can differ, and exact for integer and rounding outputs.
 - **Failure signature.** For each trap I also have Octave compute what the common wrong translation would give. If the model's output matches that wrong answer, the failure gets that signature. A signature is evidence of what the output looks like, not a diagnosis of the cause.
 - **Golden solution.** Each task has a correct numpy translation that the model never sees. Tests check that it passes and that every known-wrong variant fails, which shows the tolerances are neither too strict nor too loose.
-- **Ambiguity variant.** Each task has a second version of the spec with one thing deliberately left open. Because MATLAB source usually settles the question, these versions describe the function in words instead of showing code. They are scored on what the model does about the gap, not just whether it passes (see the end of this file).
+- **Ambiguity variant.** Each task has a second version of the spec that describes the same function in words instead of showing code, because the MATLAB source would settle the questions. What the words leave open depends on the task: one point in Tasks 1 to 3, one per trap in Tasks 4 and 5. A test enforces that the ambiguous spec asks for the same function, with the same signature and return value, as the plain one. These versions are scored on what the model does about the gaps, not just whether it passes (see the end of this file).
 
 ---
 
@@ -173,7 +173,15 @@ I use a fixed step and not `ode45` because an adaptive solver picks its own step
 
 **Why the coefficients get a looser tolerance.** The fit is a solve, and different solvers round differently. The conditioning of the 3-column matrix is small (condition number 15.8 to 21.0, recorded in the answer key), so a good solver's error is around 5e-15. Solving the normal equations instead squares that, to around 1e-13. The tolerance has to accept every legitimate route and still reject the wrong answers, which differ at order 1. A test runs five routes (`lstsq`, normal equations, QR, `pinv`, reversed `polyfit`) and checks that each passes using under a tenth of the allowed tolerance.
 
-**Ambiguity variant.** Like Task 4, this is about a smaller function, `rk4_traj(h, N)`, described in words with no code: it solves the same equation "for `N` steps" and returns a 2-row array with one column per time step. It doesn't say whether the starting state is one of the columns. The two readings are the full trajectory with the starting state (2 by N+1, the key's `Y`) and only the N states after it (2 by N). The variant is scored on that single output.
+**Ambiguity variant.** The same function, `rk4_fit(h, N)` with the same three outputs, described in words with no code: it solves the equation "for `N` steps" and returns the states as a 2-row array with one column per time step, "the coefficients of the quadratic that best fits y against time", and "the states flattened into a single column". That leaves three things open, one for each way the plain task can go wrong:
+
+| Open point | Reading A (the key) | Reading B | Outputs affected |
+|---|---|---|---|
+| Is the starting state one of the returned columns? | yes: 2 by N+1 | no: only the N states after it (2 by N), and the fit uses their own times h, 2h, ..., Nh | `Y`, `c`, `yflat` |
+| Which way round are the coefficients? | lowest power first | highest power first, like `np.polyfit` | `c` |
+| Which way is it flattened? | column by column | row by row, like numpy's `ravel` | `yflat` |
+
+Each reading changes one thing, so a response that makes two different choices matches neither and is classed as "other". The last two readings reuse the Octave results of the matching known-wrong translations. This was a smaller function, `rk4_traj`, in my first version, but then the two specs weren't the same task.
 
 ---
 
@@ -188,5 +196,5 @@ These are scored separately from pass rate, because Octave's answer is one valid
 
 ## Still to settle
 - The exact rules for detecting "asked" vs "stated an assumption".
-- Task 5's ambiguity variant is still a smaller function, `rk4_traj`, scored on a single output. It should probably become the same task as the plain spec, as Task 4's now is.
+- How to score a response to an ambiguity variant that mixes readings (for example, rounding one way and the remainder another). Each output is checked against its own readings, so a mixed response gets a result per output.
 - How the per-prompt confirmation (repeat until two consecutive replies match) is applied to scored samples.

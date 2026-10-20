@@ -23,8 +23,3 @@ def rk4_fit(h, N):
     c = np.linalg.lstsq(A, Y[0], rcond=None)[0].reshape(3, 1)       # A \ y: least squares
     yflat = Y.ravel(order="F").reshape(-1, 1)                       # column by column, like Y(:)
     return Y, c, yflat
-
-
-def rk4_traj(h, N):
-    """Golden solution for the ambiguity variant, reading A (the initial state is included)."""
-    return _trajectory(h, N)
