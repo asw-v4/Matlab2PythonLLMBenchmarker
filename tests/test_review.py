@@ -59,8 +59,8 @@ def test_an_empty_reply_is_shown_as_such():
 
 def test_the_labels_template_has_one_blank_row_per_sample():
     csv_text = review.labels_template([sample("a:ambiguous:free", "silent"), sample("b:ambiguous:free", "asked")])
-    assert csv_text.splitlines() == ["sample_id,rule_outcome,hand_outcome", "a:ambiguous:free,silent,",
-                                     "b:ambiguous:free,asked,"]
+    assert csv_text.splitlines() == ["sample_id,rule_outcome,hand_outcome,rule_documented,hand_documented",
+                                     "a:ambiguous:free,silent,,no,", "b:ambiguous:free,asked,,no,"]
 
 
 def test_a_filled_in_file_is_read_and_blank_rows_are_skipped():
@@ -143,3 +143,94 @@ def test_the_script_writes_the_sheet_then_reports_agreement(tmp_path):
     r = subprocess.run([sys.executable, str(script), str(tmp_path / "run.jsonl"), "--labels", str(tmp_path / "labels.csv")],
                        capture_output=True, text=True, timeout=120)
     assert r.returncode == 0 and "agreed on 1 (100%)" in r.stdout, r.stdout + r.stderr
+
+
+# ---- documented in code (option C)
+
+CODE_WITH_NOTES = ("```python\nimport numpy as np\ndef movavg(x, k):\n"
+                   "    \"\"\"Returns: array of length n - k + 1\"\"\"\n"
+                   "    # only full windows\n    return x\n```\n\nCONFIDENCE: 80")
+
+
+def test_the_comments_in_the_code_are_extracted_for_the_sheet():
+    notes = review.comments_in(CODE_WITH_NOTES)
+    assert "length n - k + 1" in notes and "only full windows" in notes and "return x" not in notes
+    assert review.comments_in("no code here") == ""
+    assert review.comments_in("```matlab\n% a matlab comment\n```") == ""          # only Python blocks
+
+
+def test_the_sheet_shows_the_comments_and_the_documented_flag():
+    s = sample("t01_movavg:ambiguous:free", "silent", CODE_WITH_NOTES, documented_in_code=True, flagged_in_code=False,
+               code_mention_terms=["n - k + 1"])
+    sheet = review.review_sheet([s])
+    assert "documented in code: **yes**" in sheet and "['n - k + 1']" in sheet
+    assert "Comments and docstrings in the code:" in sheet and "only full windows" in sheet
+    assert "hand documented in code (yes/no): ______" in sheet
+
+
+def test_the_sheet_says_no_when_there_are_no_notes():
+    sheet = review.review_sheet([sample("a:ambiguous:free", "silent", "```python\ndef f():\n    return 1\n```")])
+    assert "documented in code: **no**" in sheet and "(none)" in sheet
+
+
+def test_documented_labels_are_read_and_validated():
+    text = ("sample_id,rule_outcome,hand_outcome,rule_documented,hand_documented\n"
+            "a,silent,silent,yes,YES\nb,silent,silent,no,no\nc,silent,silent,no,\n")
+    assert review.read_documented_labels(text) == {"a": True, "b": False}
+    with pytest.raises(ValueError, match="yes or no"):
+        review.read_documented_labels("sample_id,hand_documented\na,maybe\n")
+
+
+def test_the_outcome_labels_still_read_with_the_new_columns_present():
+    text = "sample_id,rule_outcome,hand_outcome,rule_documented,hand_documented\na,silent,described-choice,no,yes\n"
+    assert review.read_labels(text) == {"a": "described-choice"}
+
+
+def test_documented_agreement():
+    samples = [sample("a:x:y", "silent", documented_in_code=True), sample("b:x:y", "silent", documented_in_code=False),
+               sample("c:x:y", "silent", documented_in_code=True)]
+    a = review.agreement_documented(samples, {"a:x:y": True, "b:x:y": True})
+    assert (a["n_labelled"], a["n_agree"]) == (2, 1) and a["rate"] == 0.5
+    assert a["disagreements"] == [("b:x:y", False, True)]
+    text = review.format_documented_agreement(a)
+    assert "labelled 2" in text and "50%" in text and "rule said no, by hand yes" in text
+    assert review.agreement_documented(samples, {})["rate"] is None
+
+
+# ---- rescoring an older log with the current rules
+
+STALE = {"outcome": "silent", "has_code": True, "choices": {"result": "A"}, "choice_summary": "A", "passed": True,
+         "signature": "pass", "confidence": 90.0, "control": None}                 # no documented_in_code keys at all
+
+
+def test_rescoring_adds_what_an_older_log_lacks_and_keeps_the_codes_results():
+    reply = ("```python\nimport numpy as np\ndef movavg(x, k):\n"
+             "    \"\"\"Returns: array of length n - k + 1\"\"\"\n    return x\n```\nCONFIDENCE: 90")
+    s = review.ReviewSample("t01_movavg:ambiguous:free", "t01_movavg", "ambiguous", "free", reply, dict(STALE))
+    r = review.rescore(s)
+    assert r.evaluation["documented_in_code"] is True and r.evaluation["code_mention_terms"] == ["n - k + 1"]
+    assert r.evaluation["outcome"] == "silent" and r.evaluation["passed"] is True            # kept
+    assert r.evaluation["choices"] == {"result": "A"} and r.evaluation["confidence"] == 90.0  # kept
+    assert s.evaluation == STALE                                                             # the original is untouched
+
+
+def test_rescoring_applies_the_current_rules_to_the_prose():
+    s = review.ReviewSample("t01_movavg:ambiguous:free", "t01_movavg", "ambiguous", "free",
+                            "```python\ndef movavg(x, k):\n    return x\n```\nThe result has n-k+1 entries, one per full window.",
+                            dict(STALE))
+    assert review.rescore(s).rule_outcome == "described-choice"
+    s2 = review.ReviewSample("t01_movavg:ambiguous:free", "t01_movavg", "ambiguous", "free",
+                             "Could you provide the original MATLAB code?", {**STALE, "has_code": False, "outcome": "no-answer"})
+    r2 = review.rescore(s2)
+    assert r2.rule_outcome == "asked" and r2.evaluation["asks_clarifying_question"] and not r2.evaluation["documented_in_code"]
+
+
+def test_rescoring_treats_a_format_question_marker_as_an_ask():
+    s = review.ReviewSample("t01_movavg:ambiguous:format", "t01_movavg", "ambiguous", "format", "QUESTION: n or n-1?",
+                            {**STALE, "has_code": False, "control": "question"})
+    assert review.rescore(s).rule_outcome == "asked"
+
+
+def test_rescoring_a_plain_sample_leaves_its_outcome_alone():
+    s = review.ReviewSample("t01_movavg:plain:free", "t01_movavg", "plain", "free", "x", {**STALE, "outcome": None})
+    assert review.rescore(s).evaluation["outcome"] is None

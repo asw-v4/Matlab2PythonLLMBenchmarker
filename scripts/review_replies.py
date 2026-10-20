@@ -2,7 +2,8 @@
 
     uv run python scripts/review_replies.py runs/inspect/<time>            # writes review.md and labels.csv
     uv run python scripts/review_replies.py runs/pilot/<time>/run.jsonl    # the non-Inspect log works too
-    (edit labels.csv: fill in hand_outcome for each row, using the outcomes listed in review.md)
+    (edit labels.csv: fill in hand_outcome for each row, using the outcomes listed in review.md, and
+     hand_documented with yes or no for whether the code's own comments or docstrings mention the vague point)
     uv run python scripts/review_replies.py runs/inspect/<time> --labels runs/inspect/<time>/labels.csv
 
 Only replies to the vague specs are reviewed (add --all for the plain ones too).
@@ -24,10 +25,15 @@ def main() -> int:
     ap.add_argument("log", type=Path, help="an Inspect log (.eval file or its folder) or a run.jsonl")
     ap.add_argument("--labels", type=Path, help="a filled-in labels.csv: report agreement instead of writing the sheet")
     ap.add_argument("--all", action="store_true", help="include replies to the plain specs")
+    ap.add_argument("--rescore", action="store_true",
+                    help="recompute the text judgements from the stored replies with the current rules "
+                         "(for a log written before a rule change; the code's results are kept)")
     ap.add_argument("--out", type=Path, help="folder for review.md and labels.csv (default: next to the log)")
     args = ap.parse_args()
 
     samples = review.select(review.load_samples(args.log), include_plain=args.all)
+    if args.rescore:
+        samples = [review.rescore(s) for s in samples]
     if not samples:
         print("no samples to review in that log", file=sys.stderr)
         return 1
@@ -38,7 +44,11 @@ def main() -> int:
         if unknown:
             print(f"labels for samples not in this log: {unknown}", file=sys.stderr)
             return 1
+        text = args.labels.read_text(encoding="utf-8")
         print(review.format_agreement(review.agreement(samples, labels)))
+        documented = review.read_documented_labels(text)
+        if documented:
+            print(review.format_documented_agreement(review.agreement_documented(samples, documented)))
         return 0
 
     out = args.out or (args.log if args.log.is_dir() else args.log.parent)
