@@ -159,3 +159,20 @@ def test_override_can_tighten_and_exact_wins_over_override():
                                rtol=1e-6, atol=1e-6).passed
     assert not compare_outputs(2.0 + 1e-9, exp, names=["c"], overrides={"c": dict(rtol=1e-3, atol=1e-3)},
                                exact=["c"], rtol=1e-6, atol=1e-6).passed
+
+
+# ---- NaN handling
+
+NAN_ROW = np.array([[np.nan, 1.0]])
+
+
+def test_nan_is_never_a_match_unless_asked():
+    assert not compare(NAN_ROW.copy(), NAN_ROW, **KW).passed
+    assert compare(NAN_ROW.copy(), NAN_ROW, equal_nan=True, **KW).passed
+    assert not compare(np.array([[0.0, 1.0]]), NAN_ROW, equal_nan=True, **KW).passed    # a number is not a NaN
+
+
+def test_equal_nan_is_passed_through_compare_outputs():
+    exp = {"B": NAN_ROW, "D": np.array([[1.0]])}
+    assert not compare_outputs((NAN_ROW.copy(), np.array([[1.0]])), exp, names=["B", "D"], **KW).passed
+    assert compare_outputs((NAN_ROW.copy(), np.array([[1.0]])), exp, names=["B", "D"], equal_nan=True, **KW).passed

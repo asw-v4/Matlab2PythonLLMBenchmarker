@@ -12,7 +12,8 @@ class Verdict:
     reason: str
 
 
-def compare(actual, expected, *, rtol: float, atol: float, vector_ok: bool = False) -> Verdict:
+def compare(actual, expected, *, rtol: float, atol: float, vector_ok: bool = False,
+            equal_nan: bool = False) -> Verdict:
     """Pass if `actual` matches `expected` within tolerance.
 
     With `vector_ok`, a 1-D `actual` is accepted where `expected` is a 1xM row or Mx1 column of
@@ -38,7 +39,7 @@ def compare(actual, expected, *, rtol: float, atol: float, vector_ok: bool = Fal
             return Verdict(False, f"shape-mismatch: got {actual.shape}, expected {expected.shape}")
 
     try:
-        np.testing.assert_allclose(actual, expected, rtol=rtol, atol=atol, equal_nan=False)
+        np.testing.assert_allclose(actual, expected, rtol=rtol, atol=atol, equal_nan=equal_nan)
     except AssertionError:
         return Verdict(False, "value-mismatch")
     return Verdict(True, "pass")
@@ -46,13 +47,14 @@ def compare(actual, expected, *, rtol: float, atol: float, vector_ok: bool = Fal
 
 def compare_outputs(actual, expected: dict, *, names: list[str], rtol: float, atol: float,
                     vector_ok: bool = False, exact: tuple | list | set = (),
-                    overrides: dict | None = None) -> Verdict:
+                    overrides: dict | None = None, equal_nan: bool = False) -> Verdict:
     """Compare a function's whole return value with the key, one named output at a time.
 
     A single-output task takes the array itself (or a 1-tuple). A multi-output task takes a tuple or
     list with one entry per name, in order. The first mismatching output is reported, prefixed by name.
     Outputs named in `exact` are compared with zero tolerance instead of rtol and atol, and an output in
-    `overrides` ({name: {"rtol": ..., "atol": ...}}) uses its own tolerance.
+    `overrides` ({name: {"rtol": ..., "atol": ...}}) uses its own tolerance. NaN never equals NaN unless
+    `equal_nan` is set, which is only for recognising a known-wrong answer that itself contains NaN.
     """
     overrides = overrides or {}
     if len(names) == 1:
@@ -68,7 +70,7 @@ def compare_outputs(actual, expected: dict, *, names: list[str], rtol: float, at
         tol.update(overrides.get(name, {}))
         if name in exact:
             tol = dict(rtol=0.0, atol=0.0)
-        v = compare(parts[name], expected[name], vector_ok=vector_ok, **tol)
+        v = compare(parts[name], expected[name], vector_ok=vector_ok, equal_nan=equal_nan, **tol)
         if not v.passed:
             return Verdict(False, f"{name}: {v.reason}")
     return Verdict(True, "pass")
