@@ -4,7 +4,7 @@
 
 I wanted to know how well a small local LLM can translate MATLAB code to Python. Understanding whether it knows when it has got it wrong would be nice. So this is a benchmark of MATLAB-to-Python translation tasks, built on [Inspect](https://inspect.aisi.org.uk/) (`inspect-ai`) and run entirely on my own machine.
 
-**Status:** the five pilot tasks and the harness are built and tested ([tasks](docs/tasks.md), [harness](docs/harness.md)). I haven't run the model on them yet, and the Inspect integration is still to do.
+**Status:** the five pilot tasks, the harness and the Inspect integration are built and tested ([tasks](docs/tasks.md), [harness](docs/harness.md)). I haven't run the model on them yet.
 
 ## What I'm measuring
 1. **Pass rate.** Does the Python give the same numbers as the original, within a stated tolerance?
@@ -22,6 +22,14 @@ I wanted to know how well a small local LLM can translate MATLAB code to Python.
 ## The models
 OLMo 3 7B Instruct is the main model, with OLMo 3 7B Think as the comparison (both Q8_0 GGUF). What I really want to see is whether extra reasoning helps with ambiguity or just makes wrong code more confident. Instruct and Think are trained separately, so any difference can't be pinned on reasoning alone.
 
+## How I use Inspect
+Inspect runs the evaluation: each (task, spec) is a sample, and a scorer does the checking. I tested it against a fake server that records every request, and that changed a few things:
+- **No OpenAI SDK.** Inspect's usual route to a local server needs the `openai` package, and I don't want it, so there's a small provider for `llama-server` ([src/bench/inspect_llamaserver.py](src/bench/inspect_llamaserver.py)). It sends exactly the messages, temperature, seed and max tokens and nothing else, and refuses to run if any of those three is unset, because the server's own defaults aren't temperature 0. The server's timing numbers, including whether anything came from its prompt cache, are kept in the log.
+- **One request at a time, in order.** Inspect runs many requests at once by default, and that overrode the provider's own connection limit. So the provider locks around each call, and the run uses one sample at a time to fix the order.
+- **The repeat-until-two-match step is a custom solver** that records every attempt. **Scoring is my own harness** (Docker sandbox, failure signatures, ambiguity rules) and Inspect stores the results. Inspect's default epoch reducer turns text in a dict score into numbers, so my metrics ask for the unreduced scores.
+
+Run it with `uv run python scripts/run_inspect.py` (add `--dry-run` to use a mock model instead of the server).
+
 ## One change to the chat template
 `llama-server` wouldn't start with OLMo 3's own chat template. The template uses `tools | tojson`, and llama.cpp checks it with `tools` undefined, which errors. I added one line at the top of the template and serve that patched copy ([configs/olmo3_chat_template_patched.jinja](configs/olmo3_chat_template_patched.jinja)):
 
@@ -37,8 +45,8 @@ OLMo 3 7B Instruct is the main model, with OLMo 3 7B Think as the comparison (bo
 - Python and dependencies are pinned (`.python-version`, committed `uv.lock`).
 - Every run logs the model repo and commit, GGUF SHA-256, chat template SHA-256, llama.cpp commit and backend, server flags, temperature, seed and Octave version.
 - Main runs use temperature 0. On a GPU that doesn't guarantee identical output every time, so I measure how often repeats match instead of assuming.
-- No memory carries over between samples. Each sample will be its own fresh conversation (a system message plus one spec, never anything from another sample), so the model can't answer the vague spec using what it saw in the clear one. The server runs one slot with prompt caching off, and [scripts/check_isolation.py](scripts/check_isolation.py) confirms it: it interleaves the two specs and checks that no request reuses anything from the cache. Generated code runs in a new container each time.
-- A fresh server answers some prompts differently the first time it sees them than on later repeats, even at temperature 0. The same request sequence reproduces the same replies across restarts, so it isn't random, but I don't know the cause yet ([notes](docs/warmup_study_notes.md)). `scripts/warmup.py` sends a fixed canary prompt until four replies in a row are identical and logs every request. The harness will also repeat each prompt until two consecutive replies match, score that reply, and log every attempt.
+- No memory carries over between samples. Each sample is its own fresh conversation (a system message plus one spec, never anything from another sample), so the model can't answer the vague spec using what it saw in the clear one. The server runs one slot with prompt caching off, and [scripts/check_isolation.py](scripts/check_isolation.py) confirms it: it interleaves the two specs and checks that no request reuses anything from the cache. Generated code runs in a new container each time.
+- A fresh server answers some prompts differently the first time it sees them than on later repeats, even at temperature 0. The same request sequence reproduces the same replies across restarts, so it isn't random, but I don't know the cause yet ([notes](docs/warmup_study_notes.md)). `scripts/warmup.py` sends a fixed canary prompt until four replies in a row are identical and logs every request. The harness also repeats each prompt until two consecutive replies match, scores that reply, and logs every attempt.
 - Think's decoding settings come from its model card and are reported as a separate condition.
 - Sources are in [docs/references.md](docs/references.md).
 

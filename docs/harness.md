@@ -1,8 +1,8 @@
 # The harness
 
-How a model's reply becomes a result. Everything here works without Inspect; Inspect will later drive the same
-functions. Nothing has been run against the model on the real tasks yet. The dry run replays the golden
-solutions instead.
+How a model's reply becomes a result. The harness works on its own (`scripts/run_pilot.py`), and
+`scripts/run_inspect.py` drives the same functions through Inspect (see "Inspect" below). Nothing has been run
+against the model on the real tasks yet. The dry runs replay the golden solutions instead.
 
 ## One sample, start to finish
 
@@ -98,17 +98,41 @@ These are my choices, not yours, and they affect results:
   behaviour. Task 1's same-length reading has two alignments for exactly this reason, found when the first test of the
   harness classed ordinary numpy code as matching neither.
 
+## Inspect
+
+Inspect 0.3.282, with no OpenAI SDK. What is in `src/bench/`:
+
+- `inspect_llamaserver.py`, a model provider for `llama-server` (`llamaserver/<label>`). It sends only the messages,
+  temperature, seed and max tokens, and raises an error if any of the three is unset. It serialises the HTTP calls with
+  a lock, because Inspect's default adaptive concurrency (it starts at 20 connections) overrides a provider's own
+  connection limit. The server's `timings` and build fingerprint go into each output's metadata.
+- `inspect_pilot.py`: `build_samples` (each sample's input is exactly our system + user messages), the solver
+  `confirmed_generate`, the scorer `translation_scorer`, the metrics `pilot_summary` and `ambiguity_summary`, and
+  `records_from_log`, which turns an Inspect log back into the records `report.py` reads.
+- `scripts/run_inspect.py` puts the run header (hashes, sampling, sandbox image, git state) in the log's metadata.
+
+How I checked it, against a fake server that records every request:
+
+- the request body is exactly `messages`, `temperature`, `seed`, `max_tokens`, and the messages are exactly the two we built;
+- identical consecutive calls are not cached (the confirmation step needs real repeats);
+- requests never overlap, and arrive in dataset order only with `max_samples=1`, which the script sets;
+- the `openai` package is never imported.
+
+Two things found on the way: Inspect's default epoch reducer turns the text in a dict-valued score into numbers
+before a metric sees it (so my metrics are declared `scores="unreduced"`), and a pass rate taken from the
+calibration summary silently dropped samples with no confidence (so it is now counted over all plain samples).
+
 ## Not done
 
-- The Inspect integration (needs its documentation).
 - Think. The pilot is Instruct only.
 - A run against the model on the real tasks.
 
 ## Running it
 
 ```
-uv run pytest                         # all tests, about 90 s (the Docker ones are slow)
-uv run pytest -m "not docker"         # the fast ones, about 20 s
+uv run pytest                         # all tests, about 2 min (the Docker ones are slow)
+uv run pytest -m "not docker"         # the fast ones, under a minute
 uv run python scripts/run_pilot.py --dry-run          # whole pipeline with golden answers, no model
-uv run python scripts/run_pilot.py --tasks t01_movavg # the real model (start scripts/serve.ps1 first)
+uv run python scripts/run_inspect.py --dry-run        # the same through Inspect, with a mock model
+uv run python scripts/run_inspect.py --tasks t01_movavg   # the real model (start scripts/serve.ps1 first)
 ```
