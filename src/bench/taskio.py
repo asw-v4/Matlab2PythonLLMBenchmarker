@@ -54,6 +54,8 @@ class Task:
 
 
 def _scalar_or_array(value: np.ndarray, name: str, as_int: set[str]):
+    if value.dtype.kind in "US":  # text inputs, e.g. the name of a test function
+        return str(value.item()) if value.size == 1 else value
     if value.size == 1 and name in as_int:
         return int(value.item())
     if value.size == 1:

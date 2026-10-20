@@ -26,6 +26,10 @@ def compare(actual, expected, *, rtol: float, atol: float, vector_ok: bool = Fal
     except Exception:
         return Verdict(False, "not-numeric")
 
+    # A single number is a single number: float, 0-d, (1,) and (1, 1) are all accepted for a 1x1 key.
+    if actual.shape != expected.shape and actual.size == 1 and expected.size == 1:
+        actual = actual.reshape(expected.shape)
+
     if actual.shape != expected.shape:
         is_vector = expected.ndim == 2 and 1 in expected.shape
         if vector_ok and is_vector and actual.ndim == 1 and actual.size == expected.size:

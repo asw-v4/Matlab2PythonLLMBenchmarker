@@ -103,3 +103,22 @@ def test_vector_ok_is_passed_through_per_output():
     exp = {"result": ROW}
     assert compare_outputs(np.array([1.0, 2.0, 3.0]), exp, names=["result"], vector_ok=True, **KW).passed
     assert not compare_outputs(np.array([1.0, 2.0, 3.0]), exp, names=["result"], vector_ok=False, **KW).passed
+
+
+# ---- single numbers
+
+ONE = np.array([[2.5]])
+
+
+def test_a_single_number_matches_in_any_scalar_shape():
+    for form in (2.5, np.float64(2.5), np.array(2.5), np.array([2.5]), np.array([[2.5]])):
+        assert compare(form, ONE, **KW).passed, repr(form)
+
+
+def test_a_single_number_still_has_to_be_the_right_value():
+    assert not compare(2.6, ONE, **KW).passed
+
+
+def test_scalar_leniency_does_not_apply_to_longer_arrays():
+    assert not compare(np.array([2.5, 2.5]), ONE, **KW).passed
+    assert not compare(2.5, ROW, **KW).passed

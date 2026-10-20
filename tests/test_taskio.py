@@ -84,3 +84,10 @@ def test_unrelated_variables_are_ignored(tmp_path):
 def test_missing_octave_version_is_reported_as_unknown(tmp_path):
     d = make_task(tmp_path, SINGLE, {"case01_expected": R})
     assert load_task(d).octave_version == "unknown"
+
+
+def test_text_inputs_load_as_python_strings(tmp_path):
+    d = make_task(tmp_path, SINGLE, {"case01_expected": R, "case01_in_f": "gauss", "case01_in_n": 4.0})
+    c = load_task(d).cases[0]
+    assert c.inputs["f"] == "gauss" and isinstance(c.inputs["f"], str)
+    assert c.inputs["n"] == 4.0
