@@ -1,0 +1,24 @@
+[task]
+id = "t03_simpson"
+function = "simpson"
+trap = "integration bounds"
+
+# A sum of at most 11 doubles: results can only differ in the last bits.
+[tolerance]
+rtol = 1e-12
+atol = 1e-14
+
+[inputs]
+as_int = ["n"]
+
+# Octave results of common wrong translations -> failure signature they indicate.
+[known_wrong]
+no_endpoint = "endpoint-mismatch"
+linspace_n = "endpoint-mismatch"
+weights_swapped = "weights-mismatch"
+
+# Ambiguity variant: reading A is `expected` (n subintervals); reading B is below.
+# Simpson's rule is exact for the cubic (case 1), so both readings give 4.0 there and the variant
+# is scored on cases 2 to 5 only.
+[readings]
+panels = "n panels of two subintervals each, so 2n subintervals"

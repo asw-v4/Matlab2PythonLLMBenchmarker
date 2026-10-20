@@ -8,7 +8,7 @@ Each task is a small MATLAB function. The model translates it to Python, and I c
 |---|----------|-------------------|-----------|-------------------|
 | 1 | `movavg` | Indexing | 1-based loop, end-inclusive slices | `shifted-output`, `window-mismatch` |
 | 2 | `colscale_diff` | Array orientation | Default dimension of `min` and `diff` | `nan-output`, `shape-mismatch`, `transposed-output` |
-| 3 | `simpson` | Integration bounds | Whether the endpoint is included | `endpoint-mismatch` |
+| 3 | `simpson` | Integration bounds | Whether the endpoint is included | `endpoint-mismatch`, `weights-mismatch` |
 | 4 | `robust_stats` | Silent numerical drift | Defaults that differ between the two languages | `scale-mismatch`, `rounding-mismatch`, `sign-mismatch`, `wraparound-mismatch` |
 | 5 | `rk4_fit` | Everything at once | Column-major flatten, `\` as least squares | `permuted-output`, `runtime-error` |
 
@@ -82,14 +82,15 @@ function I = simpson(f, a, b, n)
 end
 ```
 
-**Test inputs.** A few smooth functions (a cubic, `exp(-x^2)`, `sin`) with different `a`, `b` and `n`. Simpson's rule is exact for cubics, so for that case Octave's answer can also be checked against the analytic value.
+**Test inputs.** Five cases: a cubic on [0, 2] with n = 2, `exp(-x^2)` on [0, 2] with n = 10, `sin` on [0, pi] with n = 8, `x^4` on [-1, 3] with n = 6, and `1/(1+x^2)` on [0, 1] with n = 4. The functions are passed to the model as Python callables and stored in the answer key by name. Simpson's rule is exact for cubics, so that case can also be checked against the analytic value (4), and the other keys are checked against their true integrals.
 
 **What could go wrong**
 - `linspace(a, b, n+1)` includes both ends. The tempting Python equivalent `np.arange(a, b, h)` excludes `b`, and with floating-point steps it can also come out one point long or short. A missing endpoint gives the `endpoint-mismatch` signature.
 - The weights alternate 4, 2, 4, ... between the end points. In MATLAB these are `2:2:end-1` and `3:2:end-2`. A 1-based/0-based slip swaps the 4s and 2s.
-- Using `n` as the number of points instead of intervals gives a different, and possibly invalid (odd number of intervals), rule.
+- `np.linspace(a, b, n)` gives `n` points where the MATLAB code has `n+1`, while the step is still `(b-a)/n`. This is the other way of ending up with the wrong endpoint, and it also gets `endpoint-mismatch`.
+- I checked each of these against numpy: the no-endpoint and `linspace(a, b, n)` answers Octave computed are what `np.arange` and `np.linspace` code actually produces, and the swapped-weights answer matches swapped numpy slices.
 
-**Ambiguity variant.** The spec says "use n = 10" without saying whether that means 10 points or 10 subintervals.
+**Ambiguity variant.** The spec describes the function in words, with "`n` panels" and no code. A panel is one parabola, covering two subintervals, but many people use `n` for the number of subintervals, so both readings are plausible. The two Octave answers are `n` subintervals (the key) and `2n` subintervals. I originally planned "points vs subintervals", but that resolves itself: Simpson's rule needs an even number of subintervals, so only one reading is ever valid for a given `n`. For the cubic, Simpson is exact, so both readings give 4 and that case can't tell them apart. The variant is scored on the other four cases.
 
 ---
 
