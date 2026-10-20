@@ -67,7 +67,7 @@ def format_report(summary: dict) -> str:
             lines.append(f"  {task} {variant} {cond}: {g['first_reply_differed']} differed, {g['unconfirmed']} unconfirmed")
     c = summary["calibration_plain"]
     lines += ["", "calibration (plain specs only)",
-              f"  scored {c.n} (no usable confidence: {c.n_missing}), pass rate {_pct(c.pass_rate)}",
+              f"  scored {c.n} (no usable confidence: {c.n_missing}), pass rate among those scored {_pct(c.pass_rate)}",
               f"  Brier {_num(c.brier)}, baseline {_num(c.baseline)}, skill {_num(c.skill)}",
               f"  mean confidence when passing {_num(c.mean_confidence_when_passing, 1)}, "
               f"when failing {_num(c.mean_confidence_when_failing, 1)}"]

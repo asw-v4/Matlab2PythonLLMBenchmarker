@@ -82,3 +82,63 @@ def test_needs_at_least_two_attempts(n):
 def test_exactly_two_attempts_allowed_is_enough_to_confirm():
     assert confirm_reply("u", MSGS, params=PARAMS, max_attempts=2, ask=fake_ask(["A", "A"])).confirmed
     assert not confirm_reply("u", MSGS, params=PARAMS, max_attempts=2, ask=fake_ask(["B", "A"])).confirmed
+
+
+# ---- the async entry point (used inside Inspect) shares the same rules
+
+import asyncio  # noqa: E402
+
+from bench.confirm import confirm_reply_async  # noqa: E402
+
+
+def run_async(replies, **kw):
+    it = iter(replies)
+    calls = []
+
+    async def next_reply():
+        calls.append(1)
+        r = next(it)
+        return r if isinstance(r, dict) else {"text": r}
+
+    return asyncio.run(confirm_reply_async(next_reply, **kw)), calls
+
+
+def test_async_confirms_after_two_matching_replies():
+    c, calls = run_async(["A", "A", "A"])
+    assert (c.reply, c.confirmed, c.n_attempts, len(calls)) == ("A", True, 2, 2)
+
+
+def test_async_first_mode_then_steady():
+    c, _ = run_async(["B", "A", "A"])
+    assert c.reply == "A" and c.first_reply == "B" and c.first_reply_differs and c.n_attempts == 3
+
+
+def test_async_unconfirmed_returns_the_last_reply():
+    c, calls = run_async(list("ABABAB"), max_attempts=4)
+    assert (c.reply, c.confirmed, len(calls)) == ("B", False, 4)
+
+
+def test_async_keeps_whatever_details_the_fetcher_supplies():
+    c, _ = run_async([{"text": "x", "finish_reason": "length", "completion_tokens": 9, "prompt_n": 4, "cache_n": 0}] * 2)
+    a = c.attempts[0]
+    assert a.finish_reason == "length" and a.completion_tokens == 9 and a.prompt_n == 4 and a.cache_n == 0
+    assert c.truncated
+
+
+def test_async_tolerates_missing_optional_details():
+    c, _ = run_async(["x", "x"])
+    a = c.attempts[0]
+    assert a.finish_reason is None and a.prompt_n is None and a.cache_n is None
+
+
+def test_async_needs_at_least_two_attempts():
+    with pytest.raises(ValueError):
+        run_async(["A"], max_attempts=1)
+
+
+def test_reply_from_response_picks_the_fields_we_keep():
+    from bench.confirm import reply_from_response
+    r = reply_from_response({"choices": [{"message": {"content": "t"}, "finish_reason": "stop"}],
+                             "usage": {"completion_tokens": 5, "prompt_tokens": 6}, "timings": {"prompt_n": 7, "cache_n": 0}})
+    assert r == {"text": "t", "finish_reason": "stop", "completion_tokens": 5, "prompt_tokens": 6,
+                 "prompt_n": 7, "cache_n": 0}

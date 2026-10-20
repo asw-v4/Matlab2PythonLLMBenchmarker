@@ -4,12 +4,15 @@ A fresh llama-server answered some prompts differently the first time than on la
 temperature 0 (docs/warmup_study_notes.md). So every prompt is sent until two consecutive replies match,
 the reply that repeats is the one scored, and every attempt is logged. If the first reply differs from the
 confirmed one, the caller can score it too and report both.
+
+Two entry points share one tally: confirm_reply (plain HTTP, used by scripts/run_pilot.py) and
+confirm_reply_async (a coroutine that fetches replies however it likes, used inside Inspect).
 """
 from __future__ import annotations
 
 import time
 from dataclasses import asdict, dataclass
-from typing import Callable
+from typing import Awaitable, Callable
 
 from bench.llama_client import chat
 from bench.warmup import first_diff_index, sha256_text, utc_now
@@ -56,28 +59,59 @@ class Confirmed:
         return self.attempts[-1].finish_reason == "length"
 
 
+def reply_from_response(resp: dict) -> dict:
+    """The fields we keep from a raw llama-server chat-completions response."""
+    usage, timings = resp.get("usage", {}), resp.get("timings", {})
+    return {"text": resp["choices"][0]["message"]["content"], "finish_reason": resp["choices"][0].get("finish_reason"),
+            "completion_tokens": usage.get("completion_tokens"), "prompt_tokens": usage.get("prompt_tokens"),
+            "prompt_n": timings.get("prompt_n"), "cache_n": timings.get("cache_n")}
+
+
+class _Tally:
+    def __init__(self, max_attempts: int):
+        if max_attempts < 2:
+            raise ValueError("need at least 2 attempts to confirm anything")
+        self.max_attempts = max_attempts
+        self.attempts: list[Attempt] = []
+
+    def add(self, t_utc: str, latency: float, reply: dict) -> bool:
+        """Record an attempt. True once two in a row match."""
+        text = reply["text"]
+        self.attempts.append(Attempt(
+            i=len(self.attempts) + 1, t_utc=t_utc, latency_s=round(latency, 4), text=text,
+            reply_sha256=sha256_text(text), finish_reason=reply.get("finish_reason"),
+            completion_tokens=reply.get("completion_tokens"), prompt_tokens=reply.get("prompt_tokens"),
+            prompt_n=reply.get("prompt_n"), cache_n=reply.get("cache_n"),
+            first_diff_vs_previous=first_diff_index(self.attempts[-1].text, text) if self.attempts else None))
+        return len(self.attempts) >= 2 and self.attempts[-1].text == self.attempts[-2].text
+
+    def result(self, confirmed: bool) -> Confirmed:
+        a = self.attempts
+        return Confirmed(a[-1].text, confirmed, tuple(a), a[0].text)
+
+
 def confirm_reply(url: str, messages: list[dict], *, params: dict, max_attempts: int = 6,
                   ask: Callable = chat) -> Confirmed:
     """Send `messages` until two consecutive replies are identical (at most `max_attempts` times).
 
     If that never happens, the last reply is returned with confirmed=False.
     """
-    if max_attempts < 2:
-        raise ValueError("need at least 2 attempts to confirm anything")
-    attempts: list[Attempt] = []
-    for i in range(1, max_attempts + 1):
+    tally = _Tally(max_attempts)
+    for _ in range(max_attempts):
         t_utc, t0 = utc_now(), time.perf_counter()
         resp = ask(url, messages, **params)
-        latency = time.perf_counter() - t0
-        text = resp["choices"][0]["message"]["content"]
-        usage, timings = resp.get("usage", {}), resp.get("timings", {})
-        attempts.append(Attempt(
-            i=i, t_utc=t_utc, latency_s=round(latency, 4), text=text, reply_sha256=sha256_text(text),
-            finish_reason=resp["choices"][0].get("finish_reason"),
-            completion_tokens=usage.get("completion_tokens"), prompt_tokens=usage.get("prompt_tokens"),
-            prompt_n=timings.get("prompt_n"), cache_n=timings.get("cache_n"),
-            first_diff_vs_previous=first_diff_index(attempts[-1].text, text) if attempts else None,
-        ))
-        if i >= 2 and attempts[-1].text == attempts[-2].text:
-            return Confirmed(text, True, tuple(attempts), attempts[0].text)
-    return Confirmed(attempts[-1].text, False, tuple(attempts), attempts[0].text)
+        if tally.add(t_utc, time.perf_counter() - t0, reply_from_response(resp)):
+            return tally.result(True)
+    return tally.result(False)
+
+
+async def confirm_reply_async(next_reply: Callable[[], Awaitable[dict]], *, max_attempts: int = 6) -> Confirmed:
+    """Like confirm_reply, but `next_reply()` fetches each reply. It returns a dict with a "text" key and,
+    optionally, finish_reason, completion_tokens, prompt_tokens, prompt_n and cache_n."""
+    tally = _Tally(max_attempts)
+    for _ in range(max_attempts):
+        t_utc, t0 = utc_now(), time.perf_counter()
+        reply = await next_reply()
+        if tally.add(t_utc, time.perf_counter() - t0, reply):
+            return tally.result(True)
+    return tally.result(False)
