@@ -120,7 +120,17 @@ The comments above are for you, the reader. The version the model sees has none,
 - **`uint8` addition:** MATLAB saturates, so 250 + 10 is 255. numpy wraps around, so it gives 4. Signature: `wraparound-mismatch`.
 - A wrong translation only shows on the cases where its difference can: with no ties in `x`, rounding halves to even gives the same answer, and with all-positive `a` and `b`, `mod` and `rem` agree.
 
-**Ambiguity variant.** This one is about a smaller function than the other four tasks. Describing all six outputs in words would settle most of the traps (a description would have to say how to round), so the variant describes only `spread(x)`, "the standard deviation of the values in `x`", with no code. The two readings are the sample standard deviation (the key's `s`, dividing by `n-1`) and the population one (dividing by `n`). It is scored on that single output.
+**Ambiguity variant.** The same function, `robust_stats` with the same six outputs, described in words with no code. Each line of the MATLAB becomes a natural phrase: "the standard deviation of `x`", "the variance of `x`", "`x` rounded to whole numbers", "`a` modulo `b`", "the remainder of `a` divided by `b`", and "`u` plus `w`". Each phrase is open in exactly the way its trap is, so every known-wrong translation above is also a valid second reading of one phrase:
+
+| Phrase | Reading A (the key) | Reading B |
+|---|---|---|
+| standard deviation, variance | divide by `n-1` | divide by `n` |
+| rounded to whole numbers | halves round away from zero | halves round to the nearest even number |
+| modulo | sign of the divisor | sign of the dividend (like C's `%`) |
+| remainder | sign of the dividend | sign of the divisor (like Python's `%`) |
+| `u` plus `w` | `uint8` stops at 255 | wraps around at 256 |
+
+The readings reuse the Octave results of the known-wrong translations, and each covers only the outputs it concerns. On a given case a reading only differs from the key where its trap can show (no ties means no rounding difference, and so on). This was a smaller function, `spread(x)`, in my first version, but then the two specs weren't the same task, so the results couldn't be compared.
 
 ---
 
@@ -178,5 +188,5 @@ These are scored separately from pass rate, because Octave's answer is one valid
 
 ## Still to settle
 - The exact rules for detecting "asked" vs "stated an assumption".
-- How the harness runs the ambiguity variants, whose functions are named differently from the main task in Tasks 4 and 5 (`spread`, `rk4_traj`) and are scored on a single output.
+- Task 5's ambiguity variant is still a smaller function, `rk4_traj`, scored on a single output. It should probably become the same task as the plain spec, as Task 4's now is.
 - How the per-prompt confirmation (repeat until two consecutive replies match) is applied to scored samples.

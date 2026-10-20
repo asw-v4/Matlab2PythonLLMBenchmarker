@@ -25,11 +25,17 @@ rem_as_mod = "sign-mismatch"
 mod_as_rem = "sign-mismatch"
 wraparound = "wraparound-mismatch"
 
-# Ambiguity variant: a smaller function, spread(x), described in words ("the standard deviation of x").
-# Reading A is the `s` output of the key; reading B is below. Scored on `s` only.
+# Ambiguity variant: the same function, described in words instead of shown as code. Reading A is the
+# key. Each phrase of the description is open in the way the matching trap is, so each known-wrong
+# translation above is also a valid reading B of one phrase. A reading covers only the outputs it
+# concerns; all other outputs have just the one sensible reading.
 [ambiguity]
-function = "spread"
-outputs = ["s"]
+function = "robust_stats"
+outputs = ["s", "v", "r", "m", "rm", "sat"]
 
 [readings]
-population = "standard deviation dividing by n instead of n-1"
+population = "'standard deviation' and 'variance' dividing by n instead of n-1 (outputs s, v)"
+half_even = "'rounded to whole numbers' sending halves to the nearest even number (output r)"
+truncated_modulo = "'modulo' taking the sign of the dividend, like C's % (output m)"
+floored_remainder = "'remainder' taking the sign of the divisor, like Python's % (output rm)"
+wraparound = "'u plus w' wrapping around at 256 (output sat)"

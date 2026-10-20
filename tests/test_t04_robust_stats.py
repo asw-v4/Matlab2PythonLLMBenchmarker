@@ -149,21 +149,64 @@ def test_numpy_defaults_reproduce_the_octave_wrong_answers(case):
         np.testing.assert_array_equal(i["u"] + i["w"], w["wraparound"]["sat"])           # uint8 + uint8 wraps
 
 
-# ---- ambiguity variant
+# ---- ambiguity variant: the same function, described in words
+
+# reading -> (the known-wrong variant it is the same computation as, the outputs it concerns)
+READINGS = {
+    "population": ("ddof0", {"s", "v"}),
+    "half_even": ("round_half_even", {"r"}),
+    "truncated_modulo": ("mod_as_rem", {"m"}),
+    "floored_remainder": ("rem_as_mod", {"rm"}),
+    "wraparound": ("wraparound", {"sat"}),
+}
+
+
+def tol_for(name):
+    return (dict(rtol=0.0, atol=0.0) if name in EXACT
+            else dict(rtol=TOL["rtol"], atol=TOL["atol"]))
+
+
+def test_ambiguity_is_the_same_function_with_all_six_outputs():
+    assert TASK.meta["ambiguity"] == {"function": "robust_stats", "outputs": NAMES}
+    assert TASK.meta["ambiguity"]["function"] == TASK.meta["task"]["function"]
+    assert set(READINGS) == set(TASK.meta["readings"])
+
 
 @pytest.mark.parametrize("case", CASES)
-def test_population_reading_divides_by_n_and_differs_from_the_key(case):
-    x = case.inputs["x"].ravel().tolist()
-    reading = case.readings["population"]
-    assert set(reading) == {"s"}
-    np.testing.assert_allclose(reading["s"].item(), statistics.pstdev(x), rtol=1e-12)
-    assert not compare(reading["s"], case.expected["s"], **TOL).passed
-    assert compare(SOL.spread(case.inputs["x"]), case.expected["s"], **TOL).passed  # golden spread = reading A
-    assert not compare(SOL.spread(case.inputs["x"]), reading["s"], **TOL).passed
+@pytest.mark.parametrize("reading", sorted(READINGS))
+def test_each_reading_concerns_only_its_outputs_and_equals_the_matching_wrong_variant(reading, case):
+    variant, outs = READINGS[reading]
+    got = case.readings[reading]
+    assert set(got) == outs
+    for n in outs:
+        np.testing.assert_array_equal(got[n], case.wrong[variant][n])
 
 
-def test_ambiguity_function_is_declared():
-    assert TASK.meta["ambiguity"] == {"function": "spread", "outputs": ["s"]}
+@pytest.mark.parametrize("case", CASES)
+@pytest.mark.parametrize("reading", sorted(READINGS))
+def test_each_reading_differs_from_the_key_exactly_where_its_variant_does(reading, case):
+    variant, outs = READINGS[reading]
+    differs = {n for n in outs
+               if not compare(case.readings[reading][n], case.expected[n], vector_ok=True, **tol_for(n)).passed}
+    assert (differs == outs) == (case.index in BREAKS[variant][1])
+    assert differs in (set(), outs)          # a reading either changes all its outputs or none, on a given case
+
+
+@pytest.mark.parametrize("case", CASES)
+def test_reading_a_is_the_key_and_golden_matches_it_not_the_readings_where_they_differ(case):
+    out = dict(zip(NAMES, call(SOL.robust_stats, case)))
+    assert check(out, case).passed
+    for reading, (variant, outs) in READINGS.items():
+        if case.index in BREAKS[variant][1]:
+            for n in outs:
+                assert not compare(out[n], case.readings[reading][n], vector_ok=True, **tol_for(n)).passed
+
+
+def test_population_reading_agrees_with_the_standard_library():
+    for c in TASK.cases:
+        x = c.inputs["x"].ravel().tolist()
+        np.testing.assert_allclose(c.readings["population"]["s"].item(), statistics.pstdev(x), rtol=1e-12)
+        np.testing.assert_allclose(c.readings["population"]["v"].item(), statistics.pvariance(x), rtol=1e-12)
 
 
 # ---- specs
@@ -177,11 +220,28 @@ def test_spec_has_no_hints_in_the_code_and_states_the_input_types():
     assert "uint8" in spec
 
 
-def test_ambiguous_spec_leaves_the_normalisation_open_and_hides_answers():
-    amb = (TASK_DIR / "spec_ambiguous.md").read_text().lower()
-    assert "standard deviation" in amb and "spread(x)" in amb
-    for banned in ("sample", "population", "n-1", "n - 1", "unbiased", "ddof", "normali", "divid", "bessel",
-                   "round", "mod", "rem", "uint8"):
+def test_ambiguous_spec_is_the_same_task_in_words_and_settles_nothing():
+    spec = (TASK_DIR / "spec.md").read_text()
+    raw = (TASK_DIR / "spec_ambiguous.md").read_text()
+    amb = raw.lower()
+
+    # same function, signature, input types and return order as the plain spec
+    for text in (spec, raw):
+        for must in ("robust_stats(x, a, b, u, w)", "(s, v, r, m, rm, sat)", "uint8", "no zeros",
+                     "2-D numpy arrays"):
+            assert must in text, must
+
+    # described in words: one phrase per line of the MATLAB
+    for phrase in ("standard deviation of `x`", "variance of `x`", "rounded to whole numbers", "modulo",
+                   "remainder of `a` divided by `b`", "`u` plus `w`"):
+        assert phrase in amb, phrase
+    for banned in ("```", "std(", "var(", "round(", "mod(", "rem(", "u + w", "matlab's"):
         assert banned not in amb, banned
-    for text in (amb, (TASK_DIR / "spec.md").read_text().lower()):
+
+    # nothing that settles any of the ambiguities
+    for banned in ("n-1", "n - 1", "sample", "population", "unbiased", "ddof", "bessel", "half", "tie",
+                   "away from zero", "even", "floor", "truncat", "sign", "saturat", "wrap", "overflow",
+                   "clip", "255", "fmod", "c-style"):
+        assert banned not in amb, banned
+    for text in (amb, spec.lower()):
         assert "expected" not in text

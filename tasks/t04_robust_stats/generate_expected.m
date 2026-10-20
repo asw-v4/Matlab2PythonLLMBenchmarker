@@ -1,12 +1,11 @@
 % Run in Octave:  octave --no-gui --no-window-system generate_expected.m
 % Defines the fixed test inputs and writes every Octave result to expected.mat.
-% Outputs: s, v, r, m, rm, sat.  The ambiguity reading covers only `s`.
+% Outputs: s, v, r, m, rm, sat.  Each ambiguity reading covers only the outputs it concerns.
 1;
 
 here = fileparts(mfilename('fullpath'));
 addpath(fullfile(here, 'reference'));
 addpath(fullfile(here, 'known_wrong'));
-addpath(fullfile(here, 'alt_readings'));
 
 %        x                                   a                          b                       u                                w
 inputs = {
@@ -20,6 +19,15 @@ inputs = {
 wrongs = {'ddof0', 'round_half_even', 'rem_as_mod', 'mod_as_rem', 'wraparound'};
 outs = {'s', 'v', 'r', 'm', 'rm', 'sat'};
 
+%             reading name         from variant        outputs it covers
+readings = {
+  'population',         'ddof0',            {'s', 'v'};     % standard deviation / variance divide by n
+  'half_even',          'round_half_even',  {'r'};          % ties round to the nearest even number
+  'truncated_modulo',   'mod_as_rem',       {'m'};          % "modulo" taking the sign of the dividend
+  'floored_remainder',  'rem_as_mod',       {'rm'};         % "remainder" taking the sign of the divisor
+  'wraparound',         'wraparound',       {'sat'}         % uint8 addition wraps at 256
+};
+
 S = struct();
 S.octave_version = version();
 for c = 1:numel(inputs)
@@ -30,12 +38,22 @@ for c = 1:numel(inputs)
   [r1{1:6}] = robust_stats(x, a, b, u, w);
   for k = 1:6, S.([p 'expected__' outs{k}]) = r1{k}; end
 
+  W = struct();
   for q = 1:numel(wrongs)
     [r2{1:6}] = feval(['robust_stats_wrong_' wrongs{q}], x, a, b, u, w);
+    W.(wrongs{q}) = r2;
     for k = 1:6, S.([p 'wrong_' wrongs{q} '__' outs{k}]) = r2{k}; end
   end
 
-  S.([p 'reading_population__s']) = spread_population(x);
+  % The ambiguity variant describes the same function in words. Each alternative below is a
+  % valid reading of one phrase; it is the same computation as the matching known-wrong translation.
+  for q = 1:size(readings, 1)
+    res = W.(readings{q, 2});
+    for o = readings{q, 3}
+      k = find(strcmp(outs, o{1}));
+      S.([p 'reading_' readings{q, 1} '__' o{1}]) = res{k};
+    end
+  end
 end
 
 save('-v7', fullfile(here, 'expected.mat'), '-struct', 'S');
