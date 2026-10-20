@@ -140,3 +140,22 @@ def test_exact_comparison_ignores_integer_dtype_but_not_value():
     assert compare_outputs(np.array([[255.0, 255.0]]), exp, names=["sat"], exact=["sat"], **KW).passed
     assert compare_outputs(np.array([[255, 255]], dtype=np.int64), exp, names=["sat"], exact=["sat"], **KW).passed
     assert not compare_outputs(np.array([[4, 255]], dtype=np.uint8), exp, names=["sat"], exact=["sat"], **KW).passed
+
+
+# ---- per-output tolerance overrides
+
+def test_override_loosens_one_output_only():
+    exp = {"Y": np.array([[1.0]]), "c": np.array([[2.0]])}
+    out = (1.0 + 1e-9, 2.0 + 1e-9)
+    assert not compare_outputs(out, exp, names=["Y", "c"], **KW).passed
+    v = compare_outputs(out, exp, names=["Y", "c"], overrides={"c": dict(rtol=1e-6, atol=1e-6)}, **KW)
+    assert not v.passed and v.reason.startswith("Y:")           # Y still strict
+    assert compare_outputs((1.0, 2.0 + 1e-9), exp, names=["Y", "c"], overrides={"c": dict(rtol=1e-6, atol=1e-6)}, **KW).passed
+
+
+def test_override_can_tighten_and_exact_wins_over_override():
+    exp = {"c": np.array([[2.0]])}
+    assert not compare_outputs(2.0 + 1e-9, exp, names=["c"], overrides={"c": dict(rtol=1e-12, atol=1e-12)},
+                               rtol=1e-6, atol=1e-6).passed
+    assert not compare_outputs(2.0 + 1e-9, exp, names=["c"], overrides={"c": dict(rtol=1e-3, atol=1e-3)},
+                               exact=["c"], rtol=1e-6, atol=1e-6).passed

@@ -118,3 +118,17 @@ def test_exact_outputs_property(tmp_path):
 def test_exact_outputs_default_to_none(tmp_path):
     d = make_task(tmp_path, MULTI, {"case01_expected__B": R, "case01_expected__D": R})
     assert load_task(d).exact_outputs == []
+
+
+def test_tolerance_subtables_become_overrides_for_known_outputs_only(tmp_path):
+    toml = MULTI.replace('atol = 1e-9\n', 'atol = 1e-9\n[tolerance.D]\nrtol = 1e-4\natol = 1e-4\n[tolerance.zzz]\nrtol = 5\n')
+    d = make_task(tmp_path, toml, {"case01_expected__B": R, "case01_expected__D": R})
+    t = load_task(d)
+    assert t.tolerance_overrides == {"D": {"rtol": 1e-4, "atol": 1e-4}}   # "zzz" is not an output
+    assert t.tolerance["rtol"] == 1e-9
+
+
+def test_compare_kwargs_bundle_matches_the_task(tmp_path):
+    d = make_task(tmp_path, MULTI, {"case01_expected__B": R, "case01_expected__D": R})
+    kw = load_task(d).compare_kwargs()
+    assert kw == dict(names=["B", "D"], rtol=1e-9, atol=1e-9, vector_ok=False, exact=[], overrides={})

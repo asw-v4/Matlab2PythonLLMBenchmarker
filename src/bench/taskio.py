@@ -49,6 +49,17 @@ class Task:
         return self.meta["tolerance"]
 
     @property
+    def tolerance_overrides(self) -> dict[str, dict]:
+        """Per-output tolerances, from sub-tables such as [tolerance.c] in task.toml."""
+        return {k: dict(v) for k, v in self.meta["tolerance"].items()
+                if isinstance(v, dict) and k in self.output_names}
+
+    def compare_kwargs(self) -> dict:
+        """Everything compare_outputs needs from this task, apart from the outputs themselves."""
+        return dict(names=self.output_names, rtol=self.tolerance["rtol"], atol=self.tolerance["atol"],
+                    vector_ok=self.vector_ok, exact=self.exact_outputs, overrides=self.tolerance_overrides)
+
+    @property
     def exact_outputs(self) -> list[str]:
         """Outputs compared with zero tolerance (integers, rounding results)."""
         return list(self.meta["tolerance"].get("exact_outputs", []))
