@@ -6,7 +6,8 @@ param(
     [int]$Port = 8080,
     [int]$Ctx = 8192,
     [string]$Tools = "Z:\Coding\_tools",
-    [string]$Build = "b11734"
+    [string]$Build = "b11734",
+    [switch]$Metrics   # also expose /metrics (cumulative counters); does not change the model's output
 )
 
 $repo = Split-Path -Parent $PSScriptRoot
@@ -31,6 +32,7 @@ $serverArgs = @(
     "--host", "127.0.0.1",
     "--port", $Port
 )
+if ($Metrics) { $serverArgs += "--metrics" }
 
 Write-Host "$exe $($serverArgs -join ' ')"
 & $exe @serverArgs
