@@ -157,9 +157,10 @@ def test_specs_hide_answers_and_ambiguous_one_omits_code_and_the_resolution():
     spec = (TASK_DIR / "spec.md").read_text()
     amb = (TASK_DIR / "spec_ambiguous.md").read_text()
     assert "min(A)" in spec and "diff(B)" in spec
-    # shape remarks ("a single row or column") are fine; saying how to scale is not
+    # must neither say how to scale nor hint that the input can be a row or a column vector
     for banned in ("min(", "max(", "diff(B)", "per column", "each column", "column-wise", "columnwise",
-                   "per row", "each row", "overall", "whole array"):
+                   "per row", "each row", "overall", "whole array", "single row", "single column",
+                   "row or column", "row vector", "column vector"):
         assert banned not in amb.lower(), banned
     for text in (spec, amb):
         assert "expected" not in text.lower()
