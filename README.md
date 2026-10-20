@@ -4,7 +4,7 @@
 
 I wanted to know how well a small local LLM can translate MATLAB code to Python. Understanding whether it knows when it has got it wrong would be nice. So this is a benchmark of MATLAB-to-Python translation tasks, built on [Inspect](https://inspect.aisi.org.uk/) (`inspect-ai`) and run entirely on my own machine.
 
-**Status:** scaffold only. No benchmark code yet.
+**Status:** the five pilot tasks and the harness are built and tested ([tasks](docs/tasks.md), [harness](docs/harness.md)). I haven't run the model on them yet, and the Inspect integration is still to do.
 
 ## What I'm measuring
 1. **Pass rate.** Does the Python give the same numbers as the original, within a stated tolerance?
