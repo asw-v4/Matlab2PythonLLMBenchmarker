@@ -234,3 +234,51 @@ def test_rescoring_treats_a_format_question_marker_as_an_ask():
 def test_rescoring_a_plain_sample_leaves_its_outcome_alone():
     s = review.ReviewSample("t01_movavg:plain:free", "t01_movavg", "plain", "free", "x", {**STALE, "outcome": None})
     assert review.rescore(s).evaluation["outcome"] is None
+
+
+# ---- the sheet says plainly whether there is any text outside the code
+
+def test_the_sheet_says_when_there_is_no_text_outside_the_code():
+    s = sample("t01_movavg:ambiguous:free", "silent", "```python\ndef f():\n    # lots of comments about the choice\n    return 1\n```\nCONFIDENCE: 90")
+    sheet = review.review_sheet([s])
+    assert "text outside the code block: **none**" in sheet and "`silent` if there is code" in sheet
+
+
+def test_the_sheet_says_when_there_is_text_outside_the_code():
+    s = sample("t01_movavg:ambiguous:free", "described-choice", "```python\ndef f():\n    return 1\n```\nIt returns n-k+1 averages.")
+    assert "text outside the code block: **yes**" in review.review_sheet([s])
+
+
+def test_the_sheet_explains_that_the_outcome_is_prose_only():
+    sheet = review.review_sheet([sample("a:ambiguous:free", "silent")])
+    assert "PROSE only" in sheet and "never counts" in sheet and "hand_documented" in sheet
+
+
+def test_the_script_never_overwrites_an_existing_labels_file(tmp_path):
+    import subprocess
+    ask = pilot.dry_run_ask([T1])
+    with RunLog(tmp_path / "run.jsonl") as log:
+        pilot.run_pilot([T1], variants=["ambiguous"], conditions=["free"], url="u", ask=ask, runner=LOCAL,
+                        params={"temperature": 0.0, "seed": 0, "max_tokens": 10}, max_attempts=3, log=log)
+    script = Path(__file__).parent.parent / "scripts" / "review_replies.py"
+    (tmp_path / "labels.csv").write_text("my careful hand labels", encoding="utf-8")
+    r = subprocess.run([sys.executable, str(script), str(tmp_path / "run.jsonl")], capture_output=True, text=True, timeout=120)
+    assert r.returncode == 0 and "kept your existing labels.csv" in r.stdout
+    assert (tmp_path / "labels.csv").read_text(encoding="utf-8") == "my careful hand labels"
+    assert (tmp_path / "review.md").exists()                      # the sheet itself is refreshed
+
+
+def test_the_script_reads_a_labels_file_saved_with_a_byte_order_mark(tmp_path):
+    import subprocess
+    ask = pilot.dry_run_ask([T1])
+    with RunLog(tmp_path / "run.jsonl") as log:
+        pilot.run_pilot([T1], variants=["ambiguous"], conditions=["free"], url="u", ask=ask, runner=LOCAL,
+                        params={"temperature": 0.0, "seed": 0, "max_tokens": 10}, max_attempts=3, log=log)
+    sid = review.load_samples(tmp_path / "run.jsonl")[0].id
+    labels = tmp_path / "labels.csv"
+    labels.write_text(f"sample_id,rule_outcome,hand_outcome,rule_documented,hand_documented\n{sid},x,silent,no,\n",
+                      encoding="utf-8-sig")
+    script = Path(__file__).parent.parent / "scripts" / "review_replies.py"
+    r = subprocess.run([sys.executable, str(script), str(tmp_path / "run.jsonl"), "--labels", str(labels)],
+                       capture_output=True, text=True, timeout=120)
+    assert r.returncode == 0 and "labelled 1 of 1" in r.stdout, r.stderr

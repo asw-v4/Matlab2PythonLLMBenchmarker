@@ -144,12 +144,17 @@ def review_sheet(samples: list[ReviewSample]) -> str:
              "- `described-choice`: code, and the prose says what was done about the vague point without flagging it",
              "- `silent`: code with none of those",
              "- `no-answer`: no code and no question", "",
-             "The outcome is judged from the prose only. Separately, `documented in code` says whether the code's own",
-             "comments or docstrings mention the vague point. Write yes or no in labels.csv (column hand_documented).", ""]
+             "**`hand_outcome` is about the PROSE only: the text outside the code block.** Anything inside the code, its",
+             "comments and docstrings, never counts for it. So a reply with code and no text around it is `silent`, however",
+             "much its comments say. What the comments say goes in the other column: `hand_documented` (yes or no: do the",
+             "code's own comments or docstrings mention the vague point).", ""]
     for s in samples:
         e = s.evaluation
         notes = comments_in(s.reply)
+        outside = parsing.prose(s.reply).strip()
         lines += [f"## {s.id}", "",
+                  "- text outside the code block: " + ("**none**, so `silent` if there is code" if not outside
+                                                       else f"**yes**, {len(outside)} characters (shown below)"),
                   f"- rule outcome: **{s.rule_outcome}**   (choice: {e.get('choice_summary')}, per output: {e.get('choices')})",
                   f"- question sentences matched: {e.get('question_sentences') or 'none'}",
                   f"- uncertainty words matched: {e.get('assumption_cues') or 'none'}",
