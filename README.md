@@ -37,6 +37,8 @@ OLMo 3 7B Instruct is the main model, with OLMo 3 7B Think as the comparison (bo
 - Python and dependencies are pinned (`.python-version`, committed `uv.lock`).
 - Every run logs the model repo and commit, GGUF SHA-256, chat template SHA-256, llama.cpp commit and backend, server flags, temperature, seed and Octave version.
 - Main runs use temperature 0. On a GPU that doesn't guarantee identical output every time, so I measure how often repeats match instead of assuming.
+- No memory carries over between samples. Each sample will be its own fresh conversation (a system message plus one spec, never anything from another sample), so the model can't answer the vague spec using what it saw in the clear one. The server runs one slot with prompt caching off, and [scripts/check_isolation.py](scripts/check_isolation.py) confirms it: it interleaves the two specs and checks that no request reuses anything from the cache. Generated code runs in a new container each time.
+- A fresh server answers some prompts differently the first time it sees them than on later repeats, even at temperature 0. The same request sequence reproduces the same replies across restarts, so it isn't random, but I don't know the cause yet ([notes](docs/warmup_study_notes.md)). `scripts/warmup.py` sends a fixed canary prompt until four replies in a row are identical and logs every request. The harness will also repeat each prompt until two consecutive replies match, score that reply, and log every attempt.
 - Think's decoding settings come from its model card and are reported as a separate condition.
 - Sources are in [docs/references.md](docs/references.md).
 
