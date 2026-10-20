@@ -9,6 +9,7 @@ rtol = 1e-12
 atol = 1e-14
 
 [inputs]
+order = ["f", "a", "b", "n"]
 as_int = ["n"]
 
 # Octave results of common wrong translations -> failure signature they indicate.

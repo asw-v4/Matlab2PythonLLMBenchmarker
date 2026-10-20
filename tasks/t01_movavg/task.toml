@@ -16,6 +16,7 @@ vector_ok = true
 
 # Arguments passed to the model's function as Python ints rather than floats.
 [inputs]
+order = ["x", "k"]
 as_int = ["k"]
 
 # Octave results of common wrong translations -> failure signature they indicate.

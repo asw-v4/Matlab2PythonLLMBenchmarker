@@ -3,6 +3,9 @@ id = "t04_robust_stats"
 function = "robust_stats"
 trap = "silent numerical drift"
 
+[inputs]
+order = ["x", "a", "b", "u", "w"]
+
 [outputs]
 names = ["s", "v", "r", "m", "rm", "sat"]
 

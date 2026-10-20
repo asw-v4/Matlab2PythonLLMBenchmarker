@@ -35,6 +35,7 @@ class Task:
     meta: dict
     cases: list[Case]
     octave_version: str
+    dir: Path | None = None
 
     @property
     def id(self) -> str:
@@ -43,6 +44,15 @@ class Task:
     @property
     def output_names(self) -> list[str]:
         return list(self.meta.get("outputs", {}).get("names", [DEFAULT_OUTPUT]))
+
+    @property
+    def function(self) -> str:
+        return self.meta["task"]["function"]
+
+    @property
+    def arg_order(self) -> list[str]:
+        """The names of the function's arguments, in the order it is called with."""
+        return list(self.meta["inputs"]["order"])
 
     @property
     def tolerance(self) -> dict:
@@ -117,4 +127,4 @@ def load_task(task_dir: Path) -> Task:
                 raise ValueError(f"{task_dir.name}: case {c.index} reading_{k} has outputs {sorted(got)}, "
                                  f"which are not a non-empty subset of {sorted(names)}")
     version = str(mat["octave_version"].item()) if "octave_version" in mat else "unknown"
-    return Task(meta=meta, cases=ordered, octave_version=version)
+    return Task(meta=meta, cases=ordered, octave_version=version, dir=task_dir)

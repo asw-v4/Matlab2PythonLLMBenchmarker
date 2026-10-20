@@ -3,6 +3,9 @@ id = "t02_colscale_diff"
 function = "colscale_diff"
 trap = "orientation"
 
+[inputs]
+order = ["A"]
+
 [outputs]
 names = ["B", "D"]
 

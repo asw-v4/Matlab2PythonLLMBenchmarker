@@ -85,3 +85,14 @@ def test_known_wrong_variants_declared_equal_those_in_the_key(task_dir):
 def test_the_octave_key_was_made_with_the_pinned_version(task_dir):
     version = (TASKS_DIR.parent / "octave" / "VERSION").read_text().strip()
     assert load_task(task_dir).octave_version == version
+
+
+@pytest.mark.parametrize("task_dir", TASK_DIRS, ids=IDS)
+def test_argument_order_matches_the_matlab_header_and_the_inputs_in_the_key(task_dir):
+    task = load_task(task_dir)
+    plain = (task_dir / "spec.md").read_text(encoding="utf-8")
+    header_args = [a.strip() for a in HEADER.search(plain.split("```matlab")[1]).group(2).split(",")]
+    assert task.arg_order == header_args
+    for c in task.cases:
+        assert set(c.inputs) == set(task.arg_order), f"case {c.index}"
+    assert task.function == matlab_signature(plain).split("(")[0]

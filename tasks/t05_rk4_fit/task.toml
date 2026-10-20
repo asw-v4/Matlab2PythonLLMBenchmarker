@@ -26,6 +26,7 @@ atol = 1e-10
 vector_ok = true
 
 [inputs]
+order = ["h", "N"]
 as_int = ["N"]
 
 # Octave results of common wrong translations -> failure signature they indicate.
