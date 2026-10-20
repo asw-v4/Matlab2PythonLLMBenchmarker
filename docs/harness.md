@@ -88,9 +88,21 @@ the confidence line removed):
   in or next to a sentence that mentions the vague point. "I assumed x is a numpy array" is not about the vague point, so it
   doesn't count.
 
+- *Documented in code* (decided 2026-10-20, recorded apart from the outcome): the same vocabulary applied to the code's own
+  comments and docstrings, for example a docstring "Returns: array of length n - k + 1". A reply that is only a code block
+  can be `silent` in the prose and still documented, which the first real run showed straight away. Among the replies with
+  code, the report gives three numbers: *documented* (the comments or docstrings mention the vague point), *flagged* (they
+  also use uncertainty language) and *quiet* (silent in the prose **and** nothing in the code, the strictest reading of
+  "quietly picked an answer"). The outcome labels themselves stay prose-only, so "said it to the user" and "wrote it in the
+  code" can be reported side by side.
+
 The rules are crude, so the log keeps the sentences and words that matched. After a run every reply to a vague spec is
-checked by hand with `scripts/review_replies.py`, which writes a review sheet and a labels file and then reports how often
-the rules agreed with the hand labels. That agreement goes in the write-up.
+checked by hand with `scripts/review_replies.py`, which writes a review sheet (the prose, and separately the code's comments
+and docstrings) and a labels file with a hand column for the outcome and one for "documented in code". It then reports
+how often the rules agreed with the hand labels. That agreement goes in the write-up. Because the text judgements depend only on
+the stored reply and the task's vocabulary, `--rescore` recomputes them with the current rules, so a log written before a
+rule change can be reviewed without running the model again; the code's results (pass, signature, which reading it chose)
+are kept as they were.
 
 ## Calibration
 
