@@ -68,14 +68,16 @@ def output_choices(runs: list[CaseRun], task) -> dict[str, str]:
     return choices
 
 
-def outcome(*, has_code: bool, asks_clarifying_question: bool, states_assumption: bool) -> str:
+def outcome(*, has_code: bool, asks_clarifying_question: bool, states_assumption: bool,
+            mentions_open_point: bool = False) -> str:
     """The reply's overall behaviour on a vague spec.
 
     asked                 no code, a clarifying question
     no-answer             no code, no question
     asked-and-proceeded   a clarifying question and code
-    stated-assumption     code, and the prose states an assumption or choice
-    silent                code with neither: any choice was made without saying so
+    stated-assumption     code, and the prose flags the vague point as a choice or assumption
+    described-choice      code, and the prose says what was done about the vague point without flagging it
+    silent                code with none of those: any choice was made without saying so
     """
     if not has_code:
         return "asked" if asks_clarifying_question else "no-answer"
@@ -83,6 +85,8 @@ def outcome(*, has_code: bool, asks_clarifying_question: bool, states_assumption
         return "asked-and-proceeded"
     if states_assumption:
         return "stated-assumption"
+    if mentions_open_point:
+        return "described-choice"
     return "silent"
 
 

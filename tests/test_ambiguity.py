@@ -167,3 +167,15 @@ def test_summary_label_ignores_uninformative_outputs():
     assert amb.summary_label({"a": "A", "b": amb.NOT_INFORMATIVE}) == "A"
     assert amb.summary_label({"a": "A", "b": "x"}) == "mixed"
     assert amb.summary_label({}) == amb.NOT_INFORMATIVE
+
+
+def test_described_choice_sits_between_a_stated_assumption_and_silence():
+    kw = dict(has_code=True, asks_clarifying_question=False)
+    assert amb.outcome(**kw, states_assumption=False, mentions_open_point=True) == "described-choice"
+    assert amb.outcome(**kw, states_assumption=True, mentions_open_point=True) == "stated-assumption"
+    assert amb.outcome(**kw, states_assumption=False, mentions_open_point=False) == "silent"
+    # mentioning the point never changes the outcome when there is no code, or when a question was asked
+    assert amb.outcome(has_code=False, asks_clarifying_question=False, states_assumption=False,
+                       mentions_open_point=True) == "no-answer"
+    assert amb.outcome(has_code=True, asks_clarifying_question=True, states_assumption=False,
+                       mentions_open_point=True) == "asked-and-proceeded"

@@ -96,3 +96,34 @@ def test_argument_order_matches_the_matlab_header_and_the_inputs_in_the_key(task
     for c in task.cases:
         assert set(c.inputs) == set(task.arg_order), f"case {c.index}"
     assert task.function == matlab_signature(plain).split("(")[0]
+
+
+# ---- the vocabulary each task uses to recognise a reply that talks about the vague point
+
+@pytest.mark.parametrize("task_dir", TASK_DIRS, ids=IDS)
+def test_every_task_declares_an_ambiguity_with_a_vocabulary(task_dir):
+    task = load_task(task_dir)
+    amb = task.meta["ambiguity"]
+    assert amb["function"] == task.function and set(amb["outputs"]) <= set(task.output_names)
+    vocab = task.ambiguity_vocabulary
+    assert vocab and len(vocab) == len(set(vocab)) and len(vocab) >= 8
+    assert all(isinstance(t, str) and t.strip() and t == t.lower() and t == t.strip() for t in vocab)
+
+
+@pytest.mark.parametrize("task_dir", TASK_DIRS, ids=IDS)
+def test_no_vocabulary_word_is_already_in_the_vague_spec(task_dir):
+    # a reply that echoes the spec's own words would look like it had said something about the vague point
+    from bench.parsing import find_terms, normalise
+    spec = normalise((task_dir / "spec_ambiguous.md").read_text(encoding="utf-8"))
+    assert find_terms(spec, load_task(task_dir).ambiguity_vocabulary) == set()
+
+
+@pytest.mark.parametrize("task_dir", TASK_DIRS, ids=IDS)
+def test_the_vocabulary_recognises_every_reading_the_task_defines(task_dir):
+    # each alternative reading should be nameable in the vocabulary, otherwise a reply that explains its choice
+    # would go unnoticed. The check is on the task's own description of the readings.
+    task = load_task(task_dir)
+    from bench.parsing import find_terms, normalise
+    for name, description in task.meta["readings"].items():
+        hit = find_terms(normalise(description), task.ambiguity_vocabulary)
+        assert hit, f"{task_dir.name}: no vocabulary word appears in the description of reading {name!r}: {description}"

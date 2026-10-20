@@ -73,8 +73,9 @@ def test_a_cut_off_reply_is_flagged_and_fails():
 
 
 def test_text_flags_are_recorded_for_review_even_on_a_plain_spec():
-    e = ev(reply_with(GOLDEN_T1, prose_after="I assumed k is at most n."))
+    e = ev(reply_with(GOLDEN_T1, prose_after="I assumed the output only has full windows."))
     assert e.states_assumption and e.assumption_cues == ["assumed"] and e.outcome is None
+    assert e.mentions_open_point and e.mention_terms == ["full window*"]
 
 
 def test_wrong_variant_name_is_rejected():
@@ -171,3 +172,34 @@ def test_task_4_golden_passes_and_numpy_defaults_are_named():
     e = ev(reply_with(naive), task=T4, variant=AMBIGUOUS)
     assert e.choices["s"] == "population" and e.choices["r"] == "half_even" and e.choices["sat"] == "wraparound"
     assert e.choices["rm"] == "A" and e.choices["m"] == "A" and e.choice_summary == "mixed"
+
+
+# ---- the three-level text judgement, end to end (decided 2026-10-20)
+
+def test_telling_the_user_what_it_did_without_flagging_it_is_a_described_choice():
+    e = ev(reply_with(GOLDEN_T1, prose_after="The function returns n-k+1 averages, one per full window."), variant=AMBIGUOUS)
+    assert e.outcome == "described-choice" and e.mentions_open_point and not e.states_assumption
+    assert "full window*" in e.mention_terms and "n-k+1" in e.mention_terms and e.choice_summary == "A"
+
+
+def test_flagging_it_as_a_choice_is_a_stated_assumption():
+    e = ev(reply_with(GOLDEN_T1, prose_after="The spec is ambiguous, so I returned only the full windows."), variant=AMBIGUOUS)
+    assert e.outcome == "stated-assumption" and e.states_assumption and "ambiguous" in e.assumption_cues
+
+
+def test_an_assumption_about_something_else_is_still_silent_on_the_vague_point():
+    e = ev(reply_with(GOLDEN_T1, prose_after="I assumed x is a numpy array."), variant=AMBIGUOUS)
+    assert e.outcome == "silent" and not e.states_assumption and not e.mentions_open_point
+
+
+def test_could_you_provide_the_code_is_an_ask():
+    e = ev("Could you provide the original MATLAB code so I can match it exactly?", variant=AMBIGUOUS)
+    assert e.outcome == "asked" and e.question_sentences
+
+
+def test_the_vocabulary_comes_from_the_task_not_a_global_list():
+    t4 = load_task(TASKS_DIR / "t04_robust_stats")
+    golden = (TASKS_DIR / "t04_robust_stats" / "solution.py").read_text()
+    reply = reply_with(golden, prose_after="Ties round away from zero, as in MATLAB.")
+    assert evaluate_reply(reply, t4, variant=AMBIGUOUS, condition="free", runner=run_local).outcome == "described-choice"
+    assert ev(reply_with(GOLDEN_T1, prose_after="Ties round away from zero, as in MATLAB."), variant=AMBIGUOUS).outcome == "silent"

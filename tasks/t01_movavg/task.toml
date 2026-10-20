@@ -25,7 +25,20 @@ drop_first = "shifted-output"
 drop_last = "shifted-output"
 window_km1 = "window-mismatch"
 
-# Ambiguity variant: reading A is `expected`, reading B is below.
+# Ambiguity variant: the same function described in words. `vocabulary` is the words a reply uses when it
+# says something about the vague point (how long the output is, and what happens at the edges). They are
+# matched as whole words, a trailing * matches any ending, and none may appear in spec_ambiguous.md.
+[ambiguity]
+function = "movavg"
+outputs = ["result"]
+vocabulary = [
+  "same length", "same size", "input length", "output length", "length of the output", "length of the result",
+  "full window*", "partial window*", "valid", "pad", "padded", "padding", "zero-padded", "edge", "edges",
+  "boundary", "boundaries", "n-k+1", "n - k + 1", "shorter", "fewer", "trailing", "centered", "centred",
+  "'same'", "mode='same'",
+]
+
+# Reading A is `expected`; reading B is below.
 [readings]
 same = "output keeps the input length, zero-padded at the edges, centred the way MATLAB's conv 'same' does"
 same_numpy = "the same, centred the way numpy's convolve 'same' does (differs from the above only for even k)"

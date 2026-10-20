@@ -31,7 +31,7 @@ from bench.taskio import load_task
 
 TASKS_DIR = Path(__file__).resolve().parents[2] / "tasks"
 PILOT_CONFIG = GenerateConfig(temperature=0.0, seed=0, max_tokens=1500)
-OUTCOMES = ("asked", "asked-and-proceeded", "stated-assumption", "silent", "no-answer")
+OUTCOMES = ("asked", "asked-and-proceeded", "stated-assumption", "described-choice", "silent", "no-answer")
 SCORER_NAME = "translation_scorer"
 
 

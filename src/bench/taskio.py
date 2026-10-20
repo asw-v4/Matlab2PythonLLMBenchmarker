@@ -50,6 +50,12 @@ class Task:
         return self.meta["task"]["function"]
 
     @property
+    def ambiguity_vocabulary(self) -> list[str] | None:
+        """Words a reply uses when it says something about the task's vague point, or None if not declared."""
+        vocab = self.meta.get("ambiguity", {}).get("vocabulary")
+        return list(vocab) if vocab else None
+
+    @property
     def arg_order(self) -> list[str]:
         """The names of the function's arguments, in the order it is called with."""
         return list(self.meta["inputs"]["order"])

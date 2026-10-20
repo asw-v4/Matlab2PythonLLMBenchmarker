@@ -37,9 +37,19 @@ coef_order_reversed = "permuted-output"
 
 # Ambiguity variant: the same function, described in words instead of shown as code. Reading A is the
 # key. Each reading below changes one thing and covers only the outputs it concerns.
+#
+# `vocabulary` is the words a reply uses when it says something about one of the vague points (is the
+# start state returned, which way round the coefficients are, which way the states are flattened).
 [ambiguity]
 function = "rk4_fit"
 outputs = ["Y", "c", "yflat"]
+vocabulary = [
+  "initial", "initial condition", "starting state", "start state", "starting point", "after the start",
+  "first state", "t=0", "t = 0", "time zero", "drop", "dropped", "omit", "omitted", "first column", "n+1", "n + 1", "include",
+  "includes", "including", "exclude", "excludes", "excluding", "highest", "lowest", "descending", "ascending",
+  "constant term", "intercept", "polyfit", "row-major", "column-major", "row by row", "column by column",
+  "row-wise", "column-wise", "ravel", "ordering", "coefficient order", "highest power", "lowest power",
+]
 
 [readings]
 no_initial = "the returned states are only the N after the start; the fit uses their own times (outputs Y, c, yflat)"

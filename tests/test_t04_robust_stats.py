@@ -167,7 +167,7 @@ def tol_for(name):
 
 
 def test_ambiguity_is_the_same_function_with_all_six_outputs():
-    assert TASK.meta["ambiguity"] == {"function": "robust_stats", "outputs": NAMES}
+    assert TASK.meta["ambiguity"]["function"] == "robust_stats" and TASK.meta["ambiguity"]["outputs"] == NAMES
     assert TASK.meta["ambiguity"]["function"] == TASK.meta["task"]["function"]
     assert set(READINGS) == set(TASK.meta["readings"])
 

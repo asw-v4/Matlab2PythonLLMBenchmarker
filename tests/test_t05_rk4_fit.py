@@ -227,7 +227,7 @@ def tol_for(name):
 
 
 def test_ambiguity_is_the_same_function_with_all_three_outputs():
-    assert TASK.meta["ambiguity"] == {"function": "rk4_fit", "outputs": NAMES}
+    assert TASK.meta["ambiguity"]["function"] == "rk4_fit" and TASK.meta["ambiguity"]["outputs"] == NAMES
     assert TASK.meta["ambiguity"]["function"] == TASK.meta["task"]["function"]
     assert set(READINGS) == set(TASK.meta["readings"])
 

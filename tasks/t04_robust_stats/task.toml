@@ -32,9 +32,18 @@ wraparound = "wraparound-mismatch"
 # key. Each phrase of the description is open in the way the matching trap is, so each known-wrong
 # translation above is also a valid reading B of one phrase. A reading covers only the outputs it
 # concerns; all other outputs have just the one sensible reading.
+#
+# `vocabulary` is the words a reply uses when it says something about one of the vague points
+# (n or n-1, ties in rounding, the sign of mod/rem, uint8 overflow).
 [ambiguity]
 function = "robust_stats"
 outputs = ["s", "v", "r", "m", "rm", "sat"]
+vocabulary = [
+  "n-1", "n - 1", "ddof", "bessel", "sample", "population", "unbiased", "biased", "tie", "ties", "half",
+  "halves", "banker*", "away from zero", "nearest even", "round-half*", "sign of", "negative", "dividend",
+  "divisor", "floor*", "truncat*", "saturat*", "wrap", "wraps", "wraparound", "wrap-around", "overflow*",
+  "255", "256", "clip", "clipped", "clips",
+]
 
 [readings]
 population = "'standard deviation' and 'variance' dividing by n instead of n-1 (outputs s, v)"

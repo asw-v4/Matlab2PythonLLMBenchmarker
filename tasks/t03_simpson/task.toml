@@ -18,7 +18,17 @@ no_endpoint = "endpoint-mismatch"
 linspace_n = "endpoint-mismatch"
 weights_swapped = "weights-mismatch"
 
-# Ambiguity variant: reading A is `expected` (n subintervals); reading B is below.
+# Ambiguity variant: the same function described in words. `vocabulary` is the words a reply uses when it
+# says something about the vague point (what `n` counts).
+[ambiguity]
+function = "simpson"
+outputs = ["result"]
+vocabulary = [
+  "subinterval*", "interval*", "2n", "twice", "parabola*", "points", "even", "each panel", "panel width",
+  "pairs", "n+1", "n + 1",
+]
+
+# Reading A is `expected` (n subintervals); reading B is below.
 # Simpson's rule is exact for the cubic (case 1), so both readings give 4.0 there and the variant
 # is scored on cases 2 to 5 only.
 [readings]

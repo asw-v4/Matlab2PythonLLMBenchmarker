@@ -27,8 +27,10 @@ class Evaluation:
     control: str | None                # format condition only: "question", "code" or "neither"
     asks_clarifying_question: bool
     states_assumption: bool
+    mentions_open_point: bool
     question_sentences: list[str] = field(default_factory=list)
     assumption_cues: list[str] = field(default_factory=list)
+    mention_terms: list[str] = field(default_factory=list)
     # what the code did
     case_status: list[str] = field(default_factory=list)
     case_errors: list[str | None] = field(default_factory=list)
@@ -50,7 +52,7 @@ def evaluate_reply(reply: str, task, *, variant: str, condition: str,
         raise ValueError(f"variant must be {PLAIN!r} or {AMBIGUOUS!r}")
     extracted = parsing.extract_code(reply, task.function)
     confidence, note = parsing.parse_confidence(reply)
-    flags = parsing.text_flags(reply)
+    flags = parsing.text_flags(reply, vocabulary=task.ambiguity_vocabulary)
     control = parsing.parse_control(reply) if condition == "format" else None
     asks = flags.asks_clarifying_question or control == "question"
 
@@ -59,7 +61,9 @@ def evaluate_reply(reply: str, task, *, variant: str, condition: str,
         has_code=extracted.code is not None, code_reason=extracted.reason, code_truncated=extracted.truncated,
         confidence=confidence, confidence_note=note, control=control,
         asks_clarifying_question=asks, states_assumption=flags.states_assumption,
+        mentions_open_point=flags.mentions_open_point,
         question_sentences=list(flags.question_sentences), assumption_cues=list(flags.assumption_cues),
+        mention_terms=list(flags.mention_terms),
     )
 
     runs = None
@@ -75,5 +79,6 @@ def evaluate_reply(reply: str, task, *, variant: str, condition: str,
         ev.choices = amb.output_choices(runs, task) if runs is not None else {}
         ev.choice_summary = amb.summary_label(ev.choices) if runs is not None else None
         ev.outcome = amb.outcome(has_code=ev.has_code, asks_clarifying_question=asks,
-                                 states_assumption=flags.states_assumption)
+                                 states_assumption=flags.states_assumption,
+                                 mentions_open_point=flags.mentions_open_point)
     return ev

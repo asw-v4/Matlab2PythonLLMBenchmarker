@@ -26,7 +26,18 @@ axis0 = "nan-output"
 diff_last_axis = "shape-mismatch"
 transposed = "transposed-output"
 
-# Ambiguity variant: reading A is `expected` (per column); reading B is below.
+# Ambiguity variant: the same function described in words. `vocabulary` is the words a reply uses when it
+# says something about the vague point (scale per column, or over the whole array).
+[ambiguity]
+function = "colscale_diff"
+outputs = ["B", "D"]
+vocabulary = [
+  "column", "columns", "column-wise", "columnwise", "per column", "per-column", "each column", "global",
+  "overall", "whole array", "entire array", "whole matrix", "entire matrix", "all elements", "row-wise",
+  "per row", "each row",
+]
+
+# Reading A is `expected` (per column); reading B is below.
 # On a row or column vector the two readings coincide, so the variant is scored on matrices only.
 [readings]
 global = "one overall min and max for the whole array"
