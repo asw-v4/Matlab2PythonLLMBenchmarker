@@ -3,6 +3,7 @@ name = "matlab2py-bench"
 version = "0.1.0"
 requires-python = "==3.12.*"
 dependencies = [
+    "inspect-ai>=0.3.282",
     "numpy~=2.2.6",
     "scipy>=1.18.1",
 ]
