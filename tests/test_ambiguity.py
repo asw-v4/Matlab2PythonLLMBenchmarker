@@ -91,6 +91,17 @@ def test_returning_the_wrong_number_of_values_is_error():
     assert amb.output_choices(runs, task) == {"B": "error", "D": "error"}
 
 
+def test_two_alignments_of_the_same_length_reading_are_told_apart_only_by_the_even_windows():
+    task = TASKS["t01_movavg"]
+    assert amb.readings_for(task, "result") == ["same", "same_numpy"]
+    for reading in ("same", "same_numpy"):
+        runs = [outputs_with(task, c, reading) for c in task.cases]
+        assert amb.output_choices(runs, task) == {"result": reading}
+    # if every window were odd the two readings would be indistinguishable: restrict to the odd cases
+    odd = [c for c in task.cases if c.inputs["k"] % 2 == 1 and c.inputs["k"] > 1]
+    assert odd and all(c.readings["same"]["result"].tolist() == c.readings["same_numpy"]["result"].tolist() for c in odd)
+
+
 def test_a_failure_on_an_uninformative_case_does_not_count():
     # T1 reading "same" is only informative where k > 1. A crash on the k = 1 case (case 4) must not matter.
     task = TASKS["t01_movavg"]
@@ -105,6 +116,7 @@ def test_a_failure_on_an_uninformative_case_does_not_count():
 def test_informative_cases_for_each_task():
     expect = {
         ("t01_movavg", "result", "same"): [1, 2, 3, 5],
+        ("t01_movavg", "result", "same_numpy"): [1, 2, 3, 5],
         ("t02_colscale_diff", "B", "global"): [1, 2, 5],
         ("t02_colscale_diff", "D", "global"): [1, 2, 5],
         ("t03_simpson", "result", "panels"): [2, 3, 4, 5],

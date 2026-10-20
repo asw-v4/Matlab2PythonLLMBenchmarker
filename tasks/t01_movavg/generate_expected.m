@@ -29,6 +29,7 @@ for c = 1:numel(inputs)
   S.([p 'wrong_drop_last'])       = movavg_wrong_drop_last(x, k);
   S.([p 'wrong_window_km1'])      = movavg_wrong_window_km1(x, k);
   S.([p 'reading_same'])          = movavg_same(x, k);
+  S.([p 'reading_same_numpy'])    = movavg_same_numpy(x, k);
 end
 
 save('-v7', fullfile(here, 'expected.mat'), '-struct', 'S');

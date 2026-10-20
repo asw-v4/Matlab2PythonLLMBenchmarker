@@ -27,4 +27,5 @@ window_km1 = "window-mismatch"
 
 # Ambiguity variant: reading A is `expected`, reading B is below.
 [readings]
-same = "output keeps the input length, zero-padded at the edges"
+same = "output keeps the input length, zero-padded at the edges, centred the way MATLAB's conv 'same' does"
+same_numpy = "the same, centred the way numpy's convolve 'same' does (differs from the above only for even k)"

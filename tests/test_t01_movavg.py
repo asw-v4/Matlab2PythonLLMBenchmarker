@@ -96,3 +96,31 @@ def test_specs_hide_answers_and_ambiguous_one_omits_the_code():
     assert "for i" not in amb and "n-k+1" not in amb
     for text in (spec, amb):
         assert "expected" not in text.lower() and "[2 3 4" not in text
+
+
+# ---- the second same-length reading: numpy's alignment
+
+@pytest.mark.parametrize("case", CASES)
+def test_numpy_aligned_reading_is_exactly_what_np_convolve_same_gives(case):
+    x, k = case.inputs["x"].ravel(), case.inputs["k"]
+    got = case.readings["same_numpy"]["result"]
+    assert got.shape == case.inputs["x"].shape
+    np.testing.assert_allclose(got.ravel(), np.convolve(x, np.ones(k) / k, mode="same"), rtol=1e-12, atol=1e-12)
+
+
+@pytest.mark.parametrize("case", CASES)
+def test_the_two_alignments_agree_for_odd_windows_and_differ_for_even_ones(case):
+    a, b = case.readings["same"]["result"], case.readings["same_numpy"]["result"]
+    k = case.inputs["k"]
+    assert compare(a, b, **TOL).passed == (k % 2 == 1)
+
+
+def test_the_cases_cover_odd_and_even_windows():
+    ks = {c.inputs["k"] % 2 for c in TASK.cases if c.inputs["k"] > 1}
+    assert ks == {0, 1}
+
+
+@pytest.mark.parametrize("case", CASES)
+def test_numpy_aligned_reading_differs_from_the_key_when_k_gt_1(case):
+    same_as_key = compare(case.readings["same_numpy"]["result"], case.expected["result"], **TOL).passed
+    assert same_as_key == (case.inputs["k"] == 1)
