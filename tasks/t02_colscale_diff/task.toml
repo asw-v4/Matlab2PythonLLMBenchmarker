@@ -1,0 +1,29 @@
+[task]
+id = "t02_colscale_diff"
+function = "colscale_diff"
+trap = "orientation"
+
+[outputs]
+names = ["B", "D"]
+
+# Min-max scaling and differences: results can only differ in the last bits.
+[tolerance]
+rtol = 1e-12
+atol = 1e-12
+
+# Orientation is what this task tests, so a 1-D result is not accepted for a row or column.
+[shape]
+vector_ok = false
+
+# Octave results of common wrong translations -> failure signature they indicate.
+# Not every variant is wrong on every case: axis0 only fails on the row vector, diff_last_axis fails
+# on everything except the row vector.
+[known_wrong]
+axis0 = "nan-output"
+diff_last_axis = "shape-mismatch"
+transposed = "transposed-output"
+
+# Ambiguity variant: reading A is `expected` (per column); reading B is below.
+# On a row or column vector the two readings coincide, so the variant is scored on matrices only.
+[readings]
+global = "one overall min and max for the whole array"

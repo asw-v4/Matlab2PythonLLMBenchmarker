@@ -7,7 +7,7 @@ Each task is a small MATLAB function. The model translates it to Python, and I c
 | # | Function | What it's testing | Main trap | Failure signature |
 |---|----------|-------------------|-----------|-------------------|
 | 1 | `movavg` | Indexing | 1-based loop, end-inclusive slices | `shifted-output`, `window-mismatch` |
-| 2 | `colscale_diff` | Array orientation | Default dimension of `min` and `diff` | `shape-mismatch`, `transposed-output` |
+| 2 | `colscale_diff` | Array orientation | Default dimension of `min` and `diff` | `nan-output`, `shape-mismatch`, `transposed-output` |
 | 3 | `simpson` | Integration bounds | Whether the endpoint is included | `endpoint-mismatch` |
 | 4 | `robust_stats` | Silent numerical drift | Defaults that differ between the two languages | `scale-mismatch`, `rounding-mismatch`, `sign-mismatch`, `wraparound-mismatch` |
 | 5 | `rk4_fit` | Everything at once | Column-major flatten, `\` as least squares | `permuted-output`, `runtime-error` |
@@ -57,15 +57,15 @@ function [B, D] = colscale_diff(A)
 end
 ```
 
-**Test inputs.** A 4x3 matrix, a 1x5 row vector, and a 5x1 column vector. None has a constant column, so there's no 0/0.
+**Test inputs.** Five cases: a 4x3 matrix, a wide 3x5 matrix, a 1x5 row vector, a 5x1 column vector, and a 2x2 matrix. None has a constant column, so there's no 0/0. The model returns a tuple `(B, D)`, and a 1-D result is not accepted in place of a row or column here, because orientation is the point of the task.
 
 **What could go wrong**
 - MATLAB's `min`, `max` and `diff` work along the first dimension that isn't size 1. For a matrix that's down the columns. For a 1x5 row it's along the row, so `min(A)` is a single number and the whole vector is scaled together.
 - numpy's `np.diff` defaults to the last axis, not the first. On the 4x3 matrix that differences across each row instead of down it.
 - Forcing `axis=0` everywhere fixes the matrix but breaks the row vector: each element becomes its own minimum and maximum, and the result is `0/0 = NaN`.
-- These show up as `shape-mismatch`, `transposed-output` or NaN output.
+- Where each wrong translation actually fails (checked against Octave): `axis=0` everywhere is right for matrices and columns and fails only on the row vector, where it gives all NaN (`nan-output`); `np.diff`'s default axis is right only for the row vector and gives the wrong shape on the other four (`shape-mismatch`); returning the transposed results fails on all five (`transposed-output`).
 
-**Ambiguity variant.** The spec says "scale the data to the range 0 to 1" without saying per column or across the whole array.
+**Ambiguity variant.** The spec describes the function in words: it rescales the values so they run from 0 to 1 and then applies MATLAB's `diff`, without saying whether the scaling is per column or uses one minimum and maximum for the whole array. The two readings are Octave's `(A - min(A)) ./ (max(A) - min(A))` and the same with `min(A(:))` and `max(A(:))`. On a row or column vector they coincide, so this variant is only scored on the three matrix cases.
 
 ---
 
