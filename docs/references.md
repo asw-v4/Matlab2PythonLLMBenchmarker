@@ -44,10 +44,17 @@ Nothing here has been read in full. Treat every summary as a lead, not a verifie
 - Claim: distinguishes intentional sampling randomness from numerical and systems nondeterminism (batching, floating point) at temperature 0.
 
 ### Defeating Nondeterminism in LLM Inference (Thinking Machines Lab, Horace He)
-- Link: not obtained. Only secondary write-ups were seen; look up the original post by title.
-- Status: Summary only, via secondary sites.
-- Claim (secondary): the cause is batch-dependent kernels, with fixes needed for RMSNorm, matrix multiplication and attention.
-- Use here: background for why server batching/prompt caching matters.
+- Link (third-party PDF mirror of the post, printed 2025-09-17): https://www.rivista.ai/wp-content/uploads/2025/09/https___thinkingmachines.pdf
+- Original: thinkingmachines.ai blog, Horace He with Thinking Machines Lab, 10 Sep 2025, DOI 10.64434/tml.20250910. The exact URL was cut off in the PDF text, so confirm it on the site before citing.
+- Status: Read in full (text extracted from the PDF, 27 pages).
+- Claims:
+  - The common "concurrency + floating point" explanation is not the main cause. Floating-point addition is non-associative, but the kernels in an LLM forward pass are run-to-run deterministic ("there is usually not a single atomic add present").
+  - The real cause is that kernels are not batch-invariant: a request's numerics depend on batch size (and, for attention, on how many tokens are processed at once and what is in the KV cache). Server load changes the batch size, so from one user's side the system looks nondeterministic.
+  - Only three operations with reductions need care: RMSNorm, matrix multiplication and attention. The attention fix is a fixed-size split along K/V, not a fixed number of splits.
+  - Experiment: Qwen3-235B-A22B-Instruct-2507, 1000 completions at temperature 0 of the prompt "Tell me about Richard Feynman", 1000 tokens each. They got 80 unique completions (the commonest appeared 78 times), identical for the first 102 tokens and first diverging at token 103. With batch-invariant kernels all 1000 were identical.
+  - Cost: 26 s (vLLM default) vs 55 s (unoptimised deterministic) vs 42 s (improved attention kernel) for 1000 sequences on Qwen-3-8B.
+- Use here: explains why identical settings can still give different text, and that a result can be repeatable for a given sequence of requests yet differ from another. It does not explain the start-up pattern I saw in my own server (see the README's reproducibility section): that was one user, one request at a time, so changing batch size from load is not the obvious cause.
+- Note: this post is about vLLM-style GPU serving with PyTorch kernels. My server is llama.cpp with the Vulkan backend, so the mechanism is not guaranteed to carry over.
 
 ### Eliminating Nondeterminism in LLM Inference via Integer-Only Arithmetic
 - Link: https://neurips.cc/virtual/2026/170003
@@ -121,6 +128,6 @@ I found **no dedicated MATLAB-to-Python benchmark** in a small search. That does
 ## Still to look up
 - DeepSeek-R1 paper, arXiv 2501.12948 (exact temperature wording)
 - OLMo 3 Think model card (recommended decoding settings)
-- Thinking Machines "Defeating Nondeterminism in LLM Inference" (original post)
+- Thinking Machines "Defeating Nondeterminism in LLM Inference": confirm the original thinkingmachines.ai URL
 - Kadavath et al. (calibration)
 - Inspect (inspect-ai) documentation, to be pasted by the user before any Inspect code is written
