@@ -1,6 +1,6 @@
 import numpy as np
 
-from bench.scoring import compare
+from bench.scoring import compare, compare_outputs
 
 KW = dict(rtol=1e-12, atol=1e-12)
 ROW = np.array([[1.0, 2.0, 3.0]])
@@ -62,3 +62,44 @@ def test_non_numeric_fails():
 def test_empty_arrays_compare_by_shape():
     assert compare(np.zeros((1, 0)), np.zeros((1, 0)), **KW).passed
     assert not compare(np.zeros((1, 0)), ROW, **KW).passed
+
+
+# ---- compare_outputs: whole return values
+
+B = np.array([[0.0, 1.0]])
+D = np.array([[1.0]])
+EXP2 = {"B": B, "D": D}
+
+
+def test_multi_output_passes_for_tuple_or_list_in_order():
+    assert compare_outputs((B, D), EXP2, names=["B", "D"], **KW).passed
+    assert compare_outputs([B, D], EXP2, names=["B", "D"], **KW).passed
+
+
+def test_multi_output_wrong_order_fails_on_the_first_output():
+    v = compare_outputs((D, B), EXP2, names=["B", "D"], **KW)
+    assert not v.passed and v.reason.startswith("B:")
+
+
+def test_multi_output_names_the_failing_output():
+    v = compare_outputs((B, D + 1), EXP2, names=["B", "D"], **KW)
+    assert not v.passed and v.reason == "D: value-mismatch"
+
+
+def test_multi_output_wrong_count_or_not_a_sequence():
+    assert compare_outputs((B,), EXP2, names=["B", "D"], **KW).reason.startswith("wrong-number-of-outputs")
+    assert compare_outputs((B, D, D), EXP2, names=["B", "D"], **KW).reason.startswith("wrong-number-of-outputs")
+    assert compare_outputs(B, EXP2, names=["B", "D"], **KW).reason.startswith("wrong-number-of-outputs")
+
+
+def test_single_output_accepts_bare_array_or_one_tuple_but_not_a_longer_tuple():
+    exp = {"result": ROW}
+    assert compare_outputs(ROW.copy(), exp, names=["result"], **KW).passed
+    assert compare_outputs((ROW.copy(),), exp, names=["result"], **KW).passed
+    assert not compare_outputs((ROW.copy(), ROW.copy()), exp, names=["result"], **KW).passed
+
+
+def test_vector_ok_is_passed_through_per_output():
+    exp = {"result": ROW}
+    assert compare_outputs(np.array([1.0, 2.0, 3.0]), exp, names=["result"], vector_ok=True, **KW).passed
+    assert not compare_outputs(np.array([1.0, 2.0, 3.0]), exp, names=["result"], vector_ok=False, **KW).passed

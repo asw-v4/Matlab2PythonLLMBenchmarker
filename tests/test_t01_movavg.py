@@ -4,7 +4,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from bench.scoring import compare
+from bench.scoring import compare, compare_outputs
 from bench.taskio import load_task
 
 TASK_DIR = Path(__file__).parent.parent / "tasks" / "t01_movavg"
@@ -25,6 +25,7 @@ CASES = [pytest.param(c, id=f"case{c.index:02d}") for c in TASK.cases]
 
 def test_task_loads_with_five_cases_and_octave_version():
     assert TASK.id == "t01_movavg"
+    assert TASK.output_names == ["result"]
     assert len(TASK.cases) == 5
     assert TASK.octave_version == (TASK_DIR.parent.parent / "octave" / "VERSION").read_text().strip()
 
@@ -38,7 +39,7 @@ def test_inputs_have_documented_types():
 @pytest.mark.parametrize("case", CASES)
 def test_golden_solution_passes(case):
     out = GOLDEN(case.inputs["x"], case.inputs["k"])
-    v = compare(out, case.expected, vector_ok=TASK.vector_ok, **TOL)
+    v = compare_outputs(out, case.expected, names=TASK.output_names, vector_ok=TASK.vector_ok, **TOL)
     assert v.passed, v.reason
 
 
@@ -47,18 +48,18 @@ def test_octave_key_agrees_with_independent_numpy_formula(case):
     x = case.inputs["x"].ravel()
     k = case.inputs["k"]
     independent = np.convolve(x, np.ones(k) / k, mode="valid")
-    np.testing.assert_allclose(case.expected.ravel(), independent, rtol=1e-12, atol=1e-12)
+    np.testing.assert_allclose(case.expected["result"].ravel(), independent, rtol=1e-12, atol=1e-12)
 
 
 @pytest.mark.parametrize("case", CASES)
 def test_expected_has_n_minus_k_plus_1_entries(case):
-    assert case.expected.shape == (1, case.inputs["x"].shape[1] - case.inputs["k"] + 1)
+    assert case.expected["result"].shape == (1, case.inputs["x"].shape[1] - case.inputs["k"] + 1)
 
 
 @pytest.mark.parametrize("case", CASES)
 @pytest.mark.parametrize("name", sorted(TASK.meta["known_wrong"]))
 def test_every_known_wrong_variant_fails(case, name):
-    v = compare(case.wrong[name], case.expected, vector_ok=TASK.vector_ok, **TOL)
+    v = compare(case.wrong[name]["result"], case.expected["result"], vector_ok=TASK.vector_ok, **TOL)
     assert not v.passed, f"{name} unexpectedly passes on case {case.index}"
 
 
@@ -73,19 +74,19 @@ def test_known_wrong_signatures_are_labelled():
 
 @pytest.mark.parametrize("case", CASES)
 def test_same_length_reading_differs_from_valid_reading_when_k_gt_1(case):
-    reading = case.readings["same"]
+    reading = case.readings["same"]["result"]
     assert reading.shape == case.inputs["x"].shape
     if case.inputs["k"] > 1:
-        assert not compare(reading, case.expected, **TOL).passed
+        assert not compare(reading, case.expected["result"], **TOL).passed
     else:
-        assert compare(reading, case.expected, **TOL).passed  # k=1: both readings coincide
+        assert compare(reading, case.expected["result"], **TOL).passed  # k=1: both readings coincide
 
 
 def test_golden_matches_the_same_length_reading_for_no_case_with_k_gt_1():
     for c in TASK.cases:
         if c.inputs["k"] > 1:
             out = GOLDEN(c.inputs["x"], c.inputs["k"])
-            assert not compare(out, c.readings["same"], vector_ok=True, **TOL).passed
+            assert not compare(out, c.readings["same"]["result"], vector_ok=True, **TOL).passed
 
 
 def test_specs_hide_answers_and_ambiguous_one_omits_the_code():
