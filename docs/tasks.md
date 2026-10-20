@@ -109,15 +109,18 @@ function [s, v, r, m, rm, sat] = robust_stats(x, a, b, u, w)
 end
 ```
 
-**Test inputs.** A vector containing exact `.5` values and negatives, integer vectors with mixed signs (no zero divisors), and `uint8` values close to 255.
+The comments above are for you, the reader. The version the model sees has none, because they would give the traps away.
 
-**What could go wrong.** None of these raise an error; they just return a different number.
+**Test inputs.** Five cases, each a set of five row vectors. Case 1 has `.5` ties in `x`, mixed signs in `a` and `b`, and `uint8` sums that cross 255. Case 2 is deliberately plain, so only `n-1` vs `n` can show. Case 3 has ties but `a` and `b` both negative, where `mod` and `rem` agree. Case 4 has `n = 2` and full-scale `uint8` values. Case 5 has no ties but mixed signs and sums crossing 255 at different points. `std` and `var` are compared with a tight tolerance. Rounding, `mod`, `rem` and the `uint8` sum are whole numbers and must match exactly.
+
+**What could go wrong.** None of these raise an error; they just return a different number. Each known-wrong translation changes exactly one of these and leaves the rest correct, so the failure points at one cause. I checked each against numpy: `np.std` and `np.var` with their defaults, `np.round`, `%`, `np.fmod` and `uint8 + uint8` reproduce the wrong answers Octave computed.
 - **`std` and `var`:** MATLAB divides by `n-1`; numpy's default divides by `n`. The result is off by a constant factor, `sqrt((n-1)/n)` for `std`. Signature: `scale-mismatch`.
 - **`round`:** MATLAB rounds 2.5 to 3 and -2.5 to -3. numpy (and Python's own `round`) rounds halves to the nearest even number, giving 2 and -2. Signature: `rounding-mismatch`.
-- **`mod` and `rem`:** `mod` follows the sign of the divisor and `rem` follows the sign of the dividend. Python's `%` matches `mod`, so translating `rem` to `%` is wrong for negative inputs (`np.fmod` is the correct one). Signature: `sign-mismatch`.
+- **`mod` and `rem`:** `mod` follows the sign of the divisor and `rem` follows the sign of the dividend. Python's `%` matches `mod`, so translating `rem` to `%` is wrong for negative inputs (`np.fmod` is the correct one), and the reverse mistake, `mod` as `np.fmod`, is wrong in the same way. Signature: `sign-mismatch`.
 - **`uint8` addition:** MATLAB saturates, so 250 + 10 is 255. numpy wraps around, so it gives 4. Signature: `wraparound-mismatch`.
+- A wrong translation only shows on the cases where its difference can: with no ties in `x`, rounding halves to even gives the same answer, and with all-positive `a` and `b`, `mod` and `rem` agree.
 
-**Ambiguity variant.** The spec says "standard deviation" without saying sample or population.
+**Ambiguity variant.** This one is about a smaller function than the other four tasks. Describing all six outputs in words would settle most of the traps (a description would have to say how to round), so the variant describes only `spread(x)`, "the standard deviation of the values in `x`", with no code. The two readings are the sample standard deviation (the key's `s`, dividing by `n-1`) and the population one (dividing by `n`). It is scored on that single output.
 
 ---
 

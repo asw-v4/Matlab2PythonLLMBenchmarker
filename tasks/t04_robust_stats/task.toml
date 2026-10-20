@@ -1,0 +1,35 @@
+[task]
+id = "t04_robust_stats"
+function = "robust_stats"
+trap = "silent numerical drift"
+
+[outputs]
+names = ["s", "v", "r", "m", "rm", "sat"]
+
+# std and var are sums of a few doubles. The other four outputs are whole numbers and must match exactly.
+[tolerance]
+rtol = 1e-12
+atol = 1e-12
+exact_outputs = ["r", "m", "rm", "sat"]
+
+# Orientation is not what this task tests, so a 1-D result is accepted for a row.
+[shape]
+vector_ok = true
+
+# Octave results of common wrong translations -> failure signature they indicate.
+# Each variant changes exactly one thing and leaves the other outputs correct.
+[known_wrong]
+ddof0 = "scale-mismatch"
+round_half_even = "rounding-mismatch"
+rem_as_mod = "sign-mismatch"
+mod_as_rem = "sign-mismatch"
+wraparound = "wraparound-mismatch"
+
+# Ambiguity variant: a smaller function, spread(x), described in words ("the standard deviation of x").
+# Reading A is the `s` output of the key; reading B is below. Scored on `s` only.
+[ambiguity]
+function = "spread"
+outputs = ["s"]
+
+[readings]
+population = "standard deviation dividing by n instead of n-1"
