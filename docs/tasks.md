@@ -148,24 +148,35 @@ function [Y, c, yflat] = rk4_fit(h, N)
 end
 ```
 
+The comments above are for you, the reader. The version the model sees has none, because they would give the traps away.
+
 I use a fixed step and not `ode45` because an adaptive solver picks its own steps, so there would be no single right answer to check against.
 
-**Test inputs.** Two or three `(h, N)` pairs, for example `h = 0.1, N = 10`.
+**Test inputs.** Five `(h, N)` pairs: (0.1, 10), (0.05, 20), (0.2, 5), (0.25, 8) and (0.3, 3). `N` is always at least 3, so the 3-column matrix has more rows than columns and the fit really is least squares. The trajectory and the flattened column are compared with a tight tolerance (1e-12), and the coefficients with a looser one (1e-8).
 
 **What could go wrong**
 - The state is stored one column per time step, indexed `Y(:,i)` with `i` from 1. A Python port gets the indexing wrong easily.
-- `A \ y` with more rows than columns means least squares. `np.linalg.solve` needs a square matrix and raises an error; the right call is `np.linalg.lstsq`. Signature: `runtime-error`.
+- `A \ y` with more rows than columns means least squares. `np.linalg.solve` needs a square matrix and raises `LinAlgError` (checked on all five cases); the right call is `np.linalg.lstsq`. Signature: `runtime-error`.
 - `Y(:)` reads down each column in turn, so the two states are interleaved at each time step. numpy's default `ravel()` reads along rows, so all of one state comes first. The values are the same but in a different order. Signature: `permuted-output`.
-- The coefficients are slightly sensitive to rounding, so their tolerance is looser than the trajectory's. I'll record the matrix's condition number to justify it.
+- `np.polyfit` returns the coefficients highest power first, the reverse of `A \ y`. Same signature, but only the coefficients are wrong.
+- Each known-wrong translation changes exactly one output, and I checked each against numpy: `ravel()` and `polyfit` reproduce the wrong answers Octave computed.
 
-**Ambiguity variant.** The spec says "integrate to t = 1" without saying whether the returned trajectory includes the starting state (N+1 columns) or only the N later ones.
+**Why the coefficients get a looser tolerance.** The fit is a solve, and different solvers round differently. The conditioning of the 3-column matrix is small (condition number 15.8 to 21.0, recorded in the answer key), so a good solver's error is around 5e-15. Solving the normal equations instead squares that, to around 1e-13. The tolerance has to accept every legitimate route and still reject the wrong answers, which differ at order 1. A test runs five routes (`lstsq`, normal equations, QR, `pinv`, reversed `polyfit`) and checks that each passes using under a tenth of the allowed tolerance.
+
+**Ambiguity variant.** Like Task 4, this is about a smaller function, `rk4_traj(h, N)`, described in words with no code: it solves the same equation "for `N` steps" and returns a 2-row array with one column per time step. It doesn't say whether the starting state is one of the columns. The two readings are the full trajectory with the starting state (2 by N+1, the key's `Y`) and only the N states after it (2 by N). The variant is scored on that single output.
 
 ---
 
 ## How the ambiguity variants are scored
 These are scored separately from pass rate, because Octave's answer is one valid reading and not the only one. Each variant has two Octave answers, one per reading. The outcome for a sample is one of: **asked** a clarifying question, **stated an assumption** and went ahead, **silently chose** reading A, or **silently chose** reading B. Detecting these is done by rule from the response, not by a judge model.
 
+## Settled while building
+- The Octave results are `.mat` files (version 7), read with scipy.
+- Whether a 1-D result counts as a vector is set per task (`vector_ok` in `task.toml`): yes for Tasks 1, 4 and 5, no for Task 2.
+- A single number matches whether it comes back as a float, a 0-d array, or a 1x1 array.
+- Where several outputs need different strictness, `task.toml` marks some outputs exact (Task 4) or gives one its own tolerance (Task 5).
+
 ## Still to settle
-- Exact output file format for the Octave results (`.mat` read with scipy is the current plan).
-- Whether a 1-D numpy result counts as matching a vector output (leaning yes for Task 1, no where orientation is the point, as in Task 2).
 - The exact rules for detecting "asked" vs "stated an assumption".
+- How the harness runs the ambiguity variants, whose functions are named differently from the main task in Tasks 4 and 5 (`spread`, `rk4_traj`) and are scored on a single output.
+- How the per-prompt confirmation (repeat until two consecutive replies match) is applied to scored samples.

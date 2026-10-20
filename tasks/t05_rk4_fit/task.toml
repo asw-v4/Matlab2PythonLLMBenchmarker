@@ -1,0 +1,45 @@
+[task]
+id = "t05_rk4_fit"
+function = "rk4_fit"
+trap = "indexing, ordering and least squares"
+
+[outputs]
+names = ["Y", "c", "yflat"]
+
+# Y and yflat: the same arithmetic in the same order, so they can only differ in the last bits
+# (a few ulps per step, at most 20 steps).
+[tolerance]
+rtol = 1e-12
+atol = 1e-12
+
+# c comes from a least-squares solve (QR in Octave, SVD in numpy). The condition number of the 3-column
+# matrix is 15.8 to 21.0 across the cases, so a good solver's error is about cond * eps = 5e-15. A
+# legitimate alternative, solving the normal equations, squares the condition number: about
+# cond^2 * eps = 1e-13. The tolerance must accept that, and it still rejects the wrong answers
+# (a reversed coefficient order differs at order 1), so it sits well above both.
+[tolerance.c]
+rtol = 1e-8
+atol = 1e-10
+
+# Orientation is not what this task tests: a 1-D result is accepted for the 3x1 c and the flattened column.
+[shape]
+vector_ok = true
+
+[inputs]
+as_int = ["N"]
+
+# Octave results of common wrong translations -> failure signature they indicate.
+# Each variant changes exactly one output and leaves the other two correct.
+[known_wrong]
+ravel_rowmajor = "permuted-output"
+coef_order_reversed = "permuted-output"
+
+# Ambiguity variant: a smaller function, rk4_traj(h, N), described in words, no code.
+# Reading A is the `Y` output of the key (the start state is column 1); reading B drops it.
+# Scored on `Y` only.
+[ambiguity]
+function = "rk4_traj"
+outputs = ["Y"]
+
+[readings]
+no_initial = "only the N states after the start, without the initial condition"
