@@ -45,11 +45,12 @@ def compare(actual, expected, *, rtol: float, atol: float, vector_ok: bool = Fal
 
 
 def compare_outputs(actual, expected: dict, *, names: list[str], rtol: float, atol: float,
-                    vector_ok: bool = False) -> Verdict:
+                    vector_ok: bool = False, exact: tuple | list | set = ()) -> Verdict:
     """Compare a function's whole return value with the key, one named output at a time.
 
     A single-output task takes the array itself (or a 1-tuple). A multi-output task takes a tuple or
     list with one entry per name, in order. The first mismatching output is reported, prefixed by name.
+    Outputs named in `exact` are compared with zero tolerance instead of rtol and atol.
     """
     if len(names) == 1:
         if isinstance(actual, tuple) and len(actual) == 1:
@@ -60,7 +61,8 @@ def compare_outputs(actual, expected: dict, *, names: list[str], rtol: float, at
             return Verdict(False, f"wrong-number-of-outputs: expected {len(names)}")
         parts = dict(zip(names, actual))
     for name in names:
-        v = compare(parts[name], expected[name], rtol=rtol, atol=atol, vector_ok=vector_ok)
+        tol = dict(rtol=0.0, atol=0.0) if name in exact else dict(rtol=rtol, atol=atol)
+        v = compare(parts[name], expected[name], vector_ok=vector_ok, **tol)
         if not v.passed:
             return Verdict(False, f"{name}: {v.reason}")
     return Verdict(True, "pass")

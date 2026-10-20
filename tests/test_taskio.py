@@ -91,3 +91,30 @@ def test_text_inputs_load_as_python_strings(tmp_path):
     c = load_task(d).cases[0]
     assert c.inputs["f"] == "gauss" and isinstance(c.inputs["f"], str)
     assert c.inputs["n"] == 4.0
+
+
+def test_a_reading_may_cover_a_subset_of_the_outputs(tmp_path):
+    d = make_task(tmp_path, MULTI, {
+        "case01_expected__B": R, "case01_expected__D": R, "case01_reading_alt__B": R * 2,
+    })
+    c = load_task(d).cases[0]
+    assert set(c.readings["alt"]) == {"B"}
+
+
+def test_a_reading_with_an_unknown_output_is_rejected(tmp_path):
+    d = make_task(tmp_path, MULTI, {
+        "case01_expected__B": R, "case01_expected__D": R, "case01_reading_alt__Z": R,
+    })
+    with pytest.raises(ValueError, match="reading_alt"):
+        load_task(d)
+
+
+def test_exact_outputs_property(tmp_path):
+    toml = MULTI.replace('atol = 1e-9\n', 'atol = 1e-9\nexact_outputs = ["D"]\n')
+    d = make_task(tmp_path, toml, {"case01_expected__B": R, "case01_expected__D": R})
+    assert load_task(d).exact_outputs == ["D"]
+
+
+def test_exact_outputs_default_to_none(tmp_path):
+    d = make_task(tmp_path, MULTI, {"case01_expected__B": R, "case01_expected__D": R})
+    assert load_task(d).exact_outputs == []

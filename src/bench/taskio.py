@@ -49,6 +49,11 @@ class Task:
         return self.meta["tolerance"]
 
     @property
+    def exact_outputs(self) -> list[str]:
+        """Outputs compared with zero tolerance (integers, rounding results)."""
+        return list(self.meta["tolerance"].get("exact_outputs", []))
+
+    @property
     def vector_ok(self) -> bool:
         return bool(self.meta.get("shape", {}).get("vector_ok", False))
 
@@ -90,11 +95,15 @@ def load_task(task_dir: Path) -> Task:
 
     ordered = [cases[i] for i in sorted(cases)]
     for c in ordered:
-        for label, got in [("expected", c.expected),
-                           *[(f"wrong_{k}", v) for k, v in c.wrong.items()],
-                           *[(f"reading_{k}", v) for k, v in c.readings.items()]]:
+        # the key and every known-wrong variant must give every output; an alternative reading may
+        # cover only some (an ambiguity can concern a single output)
+        for label, got in [("expected", c.expected), *[(f"wrong_{k}", v) for k, v in c.wrong.items()]]:
             if set(got) != set(names):
                 raise ValueError(f"{task_dir.name}: case {c.index} {label} has outputs {sorted(got)}, "
                                  f"expected {sorted(names)}")
+        for k, got in c.readings.items():
+            if not got or not set(got) <= set(names):
+                raise ValueError(f"{task_dir.name}: case {c.index} reading_{k} has outputs {sorted(got)}, "
+                                 f"which are not a non-empty subset of {sorted(names)}")
     version = str(mat["octave_version"].item()) if "octave_version" in mat else "unknown"
     return Task(meta=meta, cases=ordered, octave_version=version)

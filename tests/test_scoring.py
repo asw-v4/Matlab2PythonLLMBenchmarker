@@ -122,3 +122,21 @@ def test_a_single_number_still_has_to_be_the_right_value():
 def test_scalar_leniency_does_not_apply_to_longer_arrays():
     assert not compare(np.array([2.5, 2.5]), ONE, **KW).passed
     assert not compare(2.5, ROW, **KW).passed
+
+
+# ---- exact outputs
+
+def test_exact_outputs_get_zero_tolerance_and_the_rest_keep_theirs():
+    exp = {"s": np.array([[1.0]]), "r": np.array([[3.0]])}
+    nudged = (1.0 + 1e-14, 3.0 + 1e-14)
+    assert compare_outputs(nudged, exp, names=["s", "r"], **KW).passed            # both within tolerance
+    v = compare_outputs(nudged, exp, names=["s", "r"], exact=["r"], **KW)
+    assert not v.passed and v.reason == "r: value-mismatch"                       # r must match exactly
+    assert compare_outputs((1.0 + 1e-14, 3.0), exp, names=["s", "r"], exact=["r"], **KW).passed
+
+
+def test_exact_comparison_ignores_integer_dtype_but_not_value():
+    exp = {"sat": np.array([[255, 255]], dtype=np.uint8)}
+    assert compare_outputs(np.array([[255.0, 255.0]]), exp, names=["sat"], exact=["sat"], **KW).passed
+    assert compare_outputs(np.array([[255, 255]], dtype=np.int64), exp, names=["sat"], exact=["sat"], **KW).passed
+    assert not compare_outputs(np.array([[4, 255]], dtype=np.uint8), exp, names=["sat"], exact=["sat"], **KW).passed
